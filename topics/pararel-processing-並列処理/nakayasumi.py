@@ -21,7 +21,7 @@ if True:
                 f.write("\n" + data)
 
     CODE = "nakayasumi.py"
-    OUTPUT_FILE = "output.txt"
+    OUTPUT_FILE = "output.yml"
     io = IO(OUTPUT_FILE)
 
     def main():

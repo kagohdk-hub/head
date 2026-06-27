@@ -17,7 +17,7 @@ if True:
                 f.write("\n" + data)
 
     CODE = "para.py"
-    OUTPUT_FILE = "output.txt"
+    OUTPUT_FILE = "output.yml"
 
     def main():
         plist = []
