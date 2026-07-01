@@ -9,16 +9,29 @@ if True:
     from random import randint
     import sys
     import subprocess
+    from ruamel.yaml import YAML
+    # custom
+
+    # ファイル入出力初期設定
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    yaml.indent(mapping=2, sequence=4, offset=2)
 
     class IO:
         def __init__(self, path: str):
             self.path = path
-        def load_text(self) -> str:
+        def text_load(self) -> str:
             with open(self.path, mode="r", encoding="utf-8") as f:
                 return f.read()
-        def dump_text(self, data: str, mode: str = "a"):
+        def text_dump(self, data: str, mode: str = "a"):
             with open(self.path, mode=mode, encoding="utf-8") as f:
                 f.write("\n" + data)
+        def yaml_load(self) -> dict | list:
+            with open(self.path, mode="r", encoding="utf-8") as f:
+                return yaml.load(f)
+        def yaml_dump(self, data: list | dict, mode="w") -> None:
+            with open(self.path, mode=mode, encoding="utf-8") as f:
+                yaml.dump(data, f)
 
     CODE = "nakayasumi.py"
     OUTPUT_FILE = "output.yml"
@@ -43,26 +56,26 @@ if True:
         ボールとってきたよ = "ボールとってきたよ"
         コート引いたよ = "コート引いたよ"
         if ボール係:
-            io.dump_text(f"{name} : 職員室にボールをとりにいく")
+            io.text_dump(f"{name} : 職員室にボールをとりにいく")
             time.sleep(0.5)
-            io.dump_text(f"{name} : 校庭に走る")
+            io.text_dump(f"{name} : 校庭に走る")
             time.sleep(0.5)
-            io.dump_text(f"{name} : {ボールとってきたよ}")
+            io.text_dump(f"{name} : {ボールとってきたよ}")
         else:
-            io.dump_text(f"{name} : 校庭に走る")
+            io.text_dump(f"{name} : 校庭に走る")
             time.sleep(0.5)
-            io.dump_text(f"{name} : 中当ての線を足で引く")
+            io.text_dump(f"{name} : 中当ての線を足で引く")
             time.sleep(1)
-            io.dump_text(f"{name} : {コート引いたよ}")
+            io.text_dump(f"{name} : {コート引いたよ}")
 
         for _ in range(10):
-            output = io.load_text()
+            output = io.text_load()
             if (ボールとってきたよ in output) and (コート引いたよ in output):
-                io.dump_text(f"{name} : 準備完了！中当て開始！！")
+                io.text_dump(f"{name} : 準備完了！中当て開始！！")
                 break
             time.sleep(0.1)
         else:
-            io.dump_text(f"{name} : 時間切れ")
+            io.text_dump(f"{name} : 時間切れ")
             return
 
     if __name__ == "__main__":
