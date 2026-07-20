@@ -1,0 +1,704 @@
+  - num: 19
+    level: 58
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 18
+      - round: 2
+        point_get: 11
+        point_total: 21
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 16
+      - round: 5
+        point_get: 11
+        point_total: 18
+    summary:
+      point_get_rate: 0.5978
+      point_get: 55
+      point_total: 92
+  - num: 30
+    level: 74
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 19
+      - round: 2
+        point_get: 11
+        point_total: 18
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 17
+      - round: 5
+        point_get: 11
+        point_total: 20
+    summary:
+      point_get_rate: 0.5914
+      point_get: 55
+      point_total: 93
+  - num: 22
+    level: 78
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 19
+      - round: 2
+        point_get: 11
+        point_total: 18
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 18
+    summary:
+      point_get_rate: 0.5851
+      point_get: 55
+      point_total: 94
+  - num: 21
+    level: 64
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 21
+      - round: 2
+        point_get: 11
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 17
+      - round: 5
+        point_get: 11
+        point_total: 20
+    summary:
+      point_get_rate: 0.567
+      point_get: 55
+      point_total: 97
+  - num: 1
+    level: 80
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 18
+      - round: 4
+        point_get: 11
+        point_total: 16
+      - round: 5
+        point_get: 9
+        point_total: 20
+    summary:
+      point_get_rate: 0.5638
+      point_get: 53
+      point_total: 94
+  - num: 14
+    level: 56
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 9
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 19
+    summary:
+      point_get_rate: 0.5408
+      point_get: 53
+      point_total: 98
+  - num: 28
+    level: 63
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 18
+      - round: 3
+        point_get: 11
+        point_total: 20
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 20
+    summary:
+      point_get_rate: 0.5408
+      point_get: 53
+      point_total: 98
+  - num: 16
+    level: 69
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 10
+        point_total: 21
+    summary:
+      point_get_rate: 0.54
+      point_get: 54
+      point_total: 100
+  - num: 26
+    level: 35
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 19
+      - round: 2
+        point_get: 7
+        point_total: 18
+      - round: 3
+        point_get: 10
+        point_total: 21
+      - round: 4
+        point_get: 11
+        point_total: 17
+      - round: 5
+        point_get: 11
+        point_total: 20
+    summary:
+      point_get_rate: 0.5263
+      point_get: 50
+      point_total: 95
+  - num: 7
+    level: 59
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 21
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 21
+    summary:
+      point_get_rate: 0.5248
+      point_get: 53
+      point_total: 101
+  - num: 18
+    level: 29
+    match_results:
+      - round: 1
+        point_get: 8
+        point_total: 19
+      - round: 2
+        point_get: 11
+        point_total: 18
+      - round: 3
+        point_get: 11
+        point_total: 18
+      - round: 4
+        point_get: 6
+        point_total: 17
+      - round: 5
+        point_get: 11
+        point_total: 18
+    summary:
+      point_get_rate: 0.5222
+      point_get: 47
+      point_total: 90
+  - num: 6
+    level: 54
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 18
+      - round: 2
+        point_get: 11
+        point_total: 19
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 21
+    summary:
+      point_get_rate: 0.5155
+      point_get: 50
+      point_total: 97
+  - num: 11
+    level: 61
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 10
+        point_total: 21
+      - round: 3
+        point_get: 11
+        point_total: 21
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 20
+    summary:
+      point_get_rate: 0.5098
+      point_get: 52
+      point_total: 102
+  - num: 3
+    level: 55
+    match_results:
+      - round: 1
+        point_get: 10
+        point_total: 21
+      - round: 2
+        point_get: 7
+        point_total: 18
+      - round: 3
+        point_get: 11
+        point_total: 20
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 21
+    summary:
+      point_get_rate: 0.5
+      point_get: 50
+      point_total: 100
+  - num: 20
+    level: 65
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 8
+        point_total: 19
+      - round: 3
+        point_get: 10
+        point_total: 21
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 18
+    summary:
+      point_get_rate: 0.5
+      point_get: 49
+      point_total: 98
+  - num: 8
+    level: 59
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 9
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 22
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 21
+    summary:
+      point_get_rate: 0.4951
+      point_get: 51
+      point_total: 103
+  - num: 4
+    level: 50
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 21
+      - round: 3
+        point_get: 7
+        point_total: 18
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 9
+        point_total: 20
+    summary:
+      point_get_rate: 0.4949
+      point_get: 49
+      point_total: 99
+  - num: 23
+    level: 63
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 19
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 17
+      - round: 5
+        point_get: 7
+        point_total: 18
+    summary:
+      point_get_rate: 0.4946
+      point_get: 46
+      point_total: 93
+  - num: 32
+    level: 63
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 20
+      - round: 3
+        point_get: 9
+        point_total: 20
+      - round: 4
+        point_get: 11
+        point_total: 21
+      - round: 5
+        point_get: 10
+        point_total: 21
+    summary:
+      point_get_rate: 0.4902
+      point_get: 50
+      point_total: 102
+  - num: 2
+    level: 45
+    match_results:
+      - round: 1
+        point_get: 8
+        point_total: 19
+      - round: 2
+        point_get: 9
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 19
+      - round: 4
+        point_get: 11
+        point_total: 21
+      - round: 5
+        point_get: 9
+        point_total: 20
+    summary:
+      point_get_rate: 0.4848
+      point_get: 48
+      point_total: 99
+  - num: 29
+    level: 37
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 7
+        point_total: 18
+      - round: 3
+        point_get: 9
+        point_total: 20
+      - round: 4
+        point_get: 11
+        point_total: 20
+      - round: 5
+        point_get: 11
+        point_total: 19
+    summary:
+      point_get_rate: 0.4845
+      point_get: 47
+      point_total: 97
+  - num: 5
+    level: 41
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 10
+        point_total: 21
+      - round: 3
+        point_get: 11
+        point_total: 21
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 10
+        point_total: 21
+    summary:
+      point_get_rate: 0.4757
+      point_get: 49
+      point_total: 103
+  - num: 25
+    level: 21
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 21
+      - round: 2
+        point_get: 11
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 22
+      - round: 4
+        point_get: 6
+        point_total: 17
+      - round: 5
+        point_get: 7
+        point_total: 18
+    summary:
+      point_get_rate: 0.4694
+      point_get: 46
+      point_total: 98
+  - num: 13
+    level: 61
+    match_results:
+      - round: 1
+        point_get: 8
+        point_total: 19
+      - round: 2
+        point_get: 9
+        point_total: 20
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 10
+        point_total: 21
+      - round: 5
+        point_get: 11
+        point_total: 20
+    summary:
+      point_get_rate: 0.4646
+      point_get: 46
+      point_total: 99
+  - num: 24
+    level: 52
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 11
+        point_total: 20
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 9
+        point_total: 20
+    summary:
+      point_get_rate: 0.4646
+      point_get: 46
+      point_total: 99
+  - num: 15
+    level: 48
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 20
+      - round: 2
+        point_get: 10
+        point_total: 21
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 6
+        point_total: 17
+      - round: 5
+        point_get: 10
+        point_total: 21
+    summary:
+      point_get_rate: 0.4592
+      point_get: 45
+      point_total: 98
+  - num: 17
+    level: 39
+    match_results:
+      - round: 1
+        point_get: 11
+        point_total: 19
+      - round: 2
+        point_get: 9
+        point_total: 20
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 7
+        point_total: 18
+    summary:
+      point_get_rate: 0.4583
+      point_get: 44
+      point_total: 96
+  - num: 10
+    level: 40
+    match_results:
+      - round: 1
+        point_get: 8
+        point_total: 19
+      - round: 2
+        point_get: 9
+        point_total: 20
+      - round: 3
+        point_get: 11
+        point_total: 22
+      - round: 4
+        point_get: 10
+        point_total: 21
+      - round: 5
+        point_get: 8
+        point_total: 19
+    summary:
+      point_get_rate: 0.4554
+      point_get: 46
+      point_total: 101
+  - num: 31
+    level: 42
+    match_results:
+      - round: 1
+        point_get: 9
+        point_total: 20
+      - round: 2
+        point_get: 10
+        point_total: 21
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 9
+        point_total: 20
+      - round: 5
+        point_get: 9
+        point_total: 20
+    summary:
+      point_get_rate: 0.45
+      point_get: 45
+      point_total: 100
+  - num: 27
+    level: 40
+    match_results:
+      - round: 1
+        point_get: 7
+        point_total: 18
+      - round: 2
+        point_get: 11
+        point_total: 21
+      - round: 3
+        point_get: 11
+        point_total: 22
+      - round: 4
+        point_get: 6
+        point_total: 17
+      - round: 5
+        point_get: 9
+        point_total: 20
+    summary:
+      point_get_rate: 0.449
+      point_get: 44
+      point_total: 98
+  - num: 12
+    level: 29
+    match_results:
+      - round: 1
+        point_get: 10
+        point_total: 21
+      - round: 2
+        point_get: 8
+        point_total: 19
+      - round: 3
+        point_get: 7
+        point_total: 18
+      - round: 4
+        point_get: 5
+        point_total: 16
+      - round: 5
+        point_get: 7
+        point_total: 18
+    summary:
+      point_get_rate: 0.4022
+      point_get: 37
+      point_total: 92
+  - num: 9
+    level: 35
+    match_results:
+      - round: 1
+        point_get: 7
+        point_total: 18
+      - round: 2
+        point_get: 7
+        point_total: 18
+      - round: 3
+        point_get: 8
+        point_total: 19
+      - round: 4
+        point_get: 5
+        point_total: 16
+      - round: 5
+        point_get: 8
+        point_total: 19
+    summary:
+      point_get_rate: 0.3889
+      point_get: 35
+      point_total: 90

@@ -1,0 +1,280 @@
+  - round: 1
+    match_pair:
+      - 1
+      - 75
+    point:
+      - 11
+      - 9
+  - round: 1
+    match_pair:
+      - 6
+      - 79
+    point:
+      - 8
+      - 11
+  - round: 1
+    match_pair:
+      - 11
+      - 69
+    point:
+      - 10
+      - 11
+  - round: 1
+    match_pair:
+      - 16
+      - 66
+    point:
+      - 11
+      - 9
+  - round: 1
+    match_pair:
+      - 21
+      - 56
+    point:
+      - 9
+      - 11
+  - round: 1
+    match_pair:
+      - 26
+      - 38
+    point:
+      - 11
+      - 7
+  - round: 1
+    match_pair:
+      - 34
+      - 46
+    point:
+      - 9
+      - 11
+  - round: 1
+    match_pair:
+      - 51
+      - 61
+    point:
+      - 8
+      - 11
+  - round: 2
+    match_pair:
+      - 2
+      - 35
+    point:
+      - 11
+      - 9
+  - round: 2
+    match_pair:
+      - 7
+      - 70
+    point:
+      - 9
+      - 11
+  - round: 2
+    match_pair:
+      - 12
+      - 73
+    point:
+      - 7
+      - 11
+  - round: 2
+    match_pair:
+      - 17
+      - 22
+    point:
+      - 11
+      - 10
+  - round: 2
+    match_pair:
+      - 27
+      - 49
+    point:
+      - 11
+      - 8
+  - round: 2
+    match_pair:
+      - 31
+      - 47
+    point:
+      - 11
+      - 10
+  - round: 2
+    match_pair:
+      - 39
+      - 64
+    point:
+      - 7
+      - 11
+  - round: 2
+    match_pair:
+      - 43
+      - 59
+    point:
+      - 9
+      - 11
+  - round: 3
+    match_pair:
+      - 3
+      - 18
+    point:
+      - 11
+      - 7
+  - round: 3
+    match_pair:
+      - 8
+      - 52
+    point:
+      - 11
+      - 8
+  - round: 3
+    match_pair:
+      - 13
+      - 80
+    point:
+      - 11
+      - 9
+  - round: 3
+    match_pair:
+      - 23
+      - 67
+    point:
+      - 11
+      - 10
+  - round: 3
+    match_pair:
+      - 28
+      - 32
+    point:
+      - 8
+      - 11
+  - round: 3
+    match_pair:
+      - 36
+      - 44
+    point:
+      - 11
+      - 11
+  - round: 3
+    match_pair:
+      - 40
+      - 54
+    point:
+      - 8
+      - 11
+  - round: 3
+    match_pair:
+      - 60
+      - 77
+    point:
+      - 11
+      - 8
+  - round: 4
+    match_pair:
+      - 4
+      - 41
+    point:
+      - 11
+      - 5
+  - round: 4
+    match_pair:
+      - 9
+      - 45
+    point:
+      - 11
+      - 10
+  - round: 4
+    match_pair:
+      - 14
+      - 33
+    point:
+      - 11
+      - 9
+  - round: 4
+    match_pair:
+      - 19
+      - 24
+    point:
+      - 11
+      - 9
+  - round: 4
+    match_pair:
+      - 29
+      - 37
+    point:
+      - 9
+      - 11
+  - round: 4
+    match_pair:
+      - 57
+      - 76
+    point:
+      - 6
+      - 11
+  - round: 4
+    match_pair:
+      - 62
+      - 74
+    point:
+      - 9
+      - 11
+  - round: 4
+    match_pair:
+      - 71
+      - 78
+    point:
+      - 11
+      - 6
+  - round: 5
+    match_pair:
+      - 5
+      - 72
+    point:
+      - 9
+      - 11
+  - round: 5
+    match_pair:
+      - 10
+      - 48
+    point:
+      - 9
+      - 11
+  - round: 5
+    match_pair:
+      - 15
+      - 58
+    point:
+      - 11
+      - 10
+  - round: 5
+    match_pair:
+      - 20
+      - 53
+    point:
+      - 9
+      - 11
+  - round: 5
+    match_pair:
+      - 25
+      - 30
+    point:
+      - 10
+      - 11
+  - round: 5
+    match_pair:
+      - 42
+      - 55
+    point:
+      - 8
+      - 11
+  - round: 5
+    match_pair:
+      - 50
+      - 68
+    point:
+      - 7
+      - 11
+  - round: 5
+    match_pair:
+      - 63
+      - 65
+    point:
+      - 7
+      - 11

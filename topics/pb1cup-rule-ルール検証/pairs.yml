@@ -1,0 +1,405 @@
+1:
+  - pair_id: 1
+    opponent_pair_id:
+    pair:
+      - 1
+      - 7
+  - pair_id: 6
+    opponent_pair_id:
+    pair:
+      - 2
+      - 10
+  - pair_id: 11
+    opponent_pair_id:
+    pair:
+      - 3
+      - 12
+  - pair_id: 16
+    opponent_pair_id:
+    pair:
+      - 4
+      - 28
+  - pair_id: 21
+    opponent_pair_id:
+    pair:
+      - 5
+      - 32
+  - pair_id: 26
+    opponent_pair_id:
+    pair:
+      - 6
+      - 19
+  - pair_id: 34
+    opponent_pair_id:
+    pair:
+      - 8
+      - 31
+  - pair_id: 38
+    opponent_pair_id:
+    pair:
+      - 9
+      - 27
+  - pair_id: 46
+    opponent_pair_id:
+    pair:
+      - 11
+      - 14
+  - pair_id: 51
+    opponent_pair_id:
+    pair:
+      - 13
+      - 18
+  - pair_id: 56
+    opponent_pair_id:
+    pair:
+      - 15
+      - 16
+  - pair_id: 61
+    opponent_pair_id:
+    pair:
+      - 17
+      - 22
+  - pair_id: 66
+    opponent_pair_id:
+    pair:
+      - 20
+      - 29
+  - pair_id: 69
+    opponent_pair_id:
+    pair:
+      - 21
+      - 25
+  - pair_id: 75
+    opponent_pair_id:
+    pair:
+      - 23
+      - 24
+  - pair_id: 79
+    opponent_pair_id:
+    pair:
+      - 26
+      - 30
+2:
+  - pair_id: 2
+    opponent_pair_id:
+    pair:
+      - 1
+      - 24
+  - pair_id: 7
+    opponent_pair_id:
+    pair:
+      - 2
+      - 13
+  - pair_id: 12
+    opponent_pair_id:
+    pair:
+      - 3
+      - 29
+  - pair_id: 17
+    opponent_pair_id:
+    pair:
+      - 4
+      - 27
+  - pair_id: 22
+    opponent_pair_id:
+    pair:
+      - 5
+      - 31
+  - pair_id: 27
+    opponent_pair_id:
+    pair:
+      - 6
+      - 23
+  - pair_id: 31
+    opponent_pair_id:
+    pair:
+      - 7
+      - 19
+  - pair_id: 35
+    opponent_pair_id:
+    pair:
+      - 8
+      - 14
+  - pair_id: 39
+    opponent_pair_id:
+    pair:
+      - 9
+      - 26
+  - pair_id: 43
+    opponent_pair_id:
+    pair:
+      - 10
+      - 17
+  - pair_id: 47
+    opponent_pair_id:
+    pair:
+      - 11
+      - 15
+  - pair_id: 49
+    opponent_pair_id:
+    pair:
+      - 12
+      - 20
+  - pair_id: 59
+    opponent_pair_id:
+    pair:
+      - 16
+      - 25
+  - pair_id: 64
+    opponent_pair_id:
+    pair:
+      - 18
+      - 30
+  - pair_id: 70
+    opponent_pair_id:
+    pair:
+      - 21
+      - 32
+  - pair_id: 73
+    opponent_pair_id:
+    pair:
+      - 22
+      - 28
+3:
+  - pair_id: 3
+    opponent_pair_id:
+    pair:
+      - 1
+      - 18
+  - pair_id: 8
+    opponent_pair_id:
+    pair:
+      - 2
+      - 22
+  - pair_id: 13
+    opponent_pair_id:
+    pair:
+      - 3
+      - 28
+  - pair_id: 18
+    opponent_pair_id:
+    pair:
+      - 4
+      - 12
+  - pair_id: 23
+    opponent_pair_id:
+    pair:
+      - 5
+      - 11
+  - pair_id: 28
+    opponent_pair_id:
+    pair:
+      - 6
+      - 15
+  - pair_id: 32
+    opponent_pair_id:
+    pair:
+      - 7
+      - 30
+  - pair_id: 36
+    opponent_pair_id:
+    pair:
+      - 8
+      - 25
+  - pair_id: 40
+    opponent_pair_id:
+    pair:
+      - 9
+      - 23
+  - pair_id: 44
+    opponent_pair_id:
+    pair:
+      - 10
+      - 27
+  - pair_id: 52
+    opponent_pair_id:
+    pair:
+      - 13
+      - 17
+  - pair_id: 54
+    opponent_pair_id:
+    pair:
+      - 14
+      - 21
+  - pair_id: 60
+    opponent_pair_id:
+    pair:
+      - 16
+      - 19
+  - pair_id: 67
+    opponent_pair_id:
+    pair:
+      - 20
+      - 26
+  - pair_id: 77
+    opponent_pair_id:
+    pair:
+      - 24
+      - 31
+  - pair_id: 80
+    opponent_pair_id:
+    pair:
+      - 29
+      - 32
+4:
+  - pair_id: 4
+    opponent_pair_id:
+    pair:
+      - 1
+      - 19
+  - pair_id: 9
+    opponent_pair_id:
+    pair:
+      - 2
+      - 32
+  - pair_id: 14
+    opponent_pair_id:
+    pair:
+      - 3
+      - 20
+  - pair_id: 19
+    opponent_pair_id:
+    pair:
+      - 4
+      - 14
+  - pair_id: 24
+    opponent_pair_id:
+    pair:
+      - 5
+      - 24
+  - pair_id: 29
+    opponent_pair_id:
+    pair:
+      - 6
+      - 11
+  - pair_id: 33
+    opponent_pair_id:
+    pair:
+      - 7
+      - 31
+  - pair_id: 37
+    opponent_pair_id:
+    pair:
+      - 8
+      - 16
+  - pair_id: 41
+    opponent_pair_id:
+    pair:
+      - 9
+      - 12
+  - pair_id: 45
+    opponent_pair_id:
+    pair:
+      - 10
+      - 13
+  - pair_id: 57
+    opponent_pair_id:
+    pair:
+      - 15
+      - 18
+  - pair_id: 62
+    opponent_pair_id:
+    pair:
+      - 17
+      - 28
+  - pair_id: 71
+    opponent_pair_id:
+    pair:
+      - 21
+      - 26
+  - pair_id: 74
+    opponent_pair_id:
+    pair:
+      - 22
+      - 29
+  - pair_id: 76
+    opponent_pair_id:
+    pair:
+      - 23
+      - 30
+  - pair_id: 78
+    opponent_pair_id:
+    pair:
+      - 25
+      - 27
+5:
+  - pair_id: 5
+    opponent_pair_id:
+    pair:
+      - 1
+      - 27
+  - pair_id: 10
+    opponent_pair_id:
+    pair:
+      - 2
+      - 31
+  - pair_id: 15
+    opponent_pair_id:
+    pair:
+      - 3
+      - 8
+  - pair_id: 20
+    opponent_pair_id:
+    pair:
+      - 4
+      - 24
+  - pair_id: 25
+    opponent_pair_id:
+    pair:
+      - 5
+      - 16
+  - pair_id: 30
+    opponent_pair_id:
+    pair:
+      - 6
+      - 7
+  - pair_id: 42
+    opponent_pair_id:
+    pair:
+      - 9
+      - 10
+  - pair_id: 48
+    opponent_pair_id:
+    pair:
+      - 11
+      - 26
+  - pair_id: 50
+    opponent_pair_id:
+    pair:
+      - 12
+      - 23
+  - pair_id: 53
+    opponent_pair_id:
+    pair:
+      - 13
+      - 28
+  - pair_id: 55
+    opponent_pair_id:
+    pair:
+      - 14
+      - 29
+  - pair_id: 58
+    opponent_pair_id:
+    pair:
+      - 15
+      - 32
+  - pair_id: 63
+    opponent_pair_id:
+    pair:
+      - 17
+      - 25
+  - pair_id: 65
+    opponent_pair_id:
+    pair:
+      - 18
+      - 19
+  - pair_id: 68
+    opponent_pair_id:
+    pair:
+      - 20
+      - 22
+  - pair_id: 72
+    opponent_pair_id:
+    pair:
+      - 21
+      - 30
