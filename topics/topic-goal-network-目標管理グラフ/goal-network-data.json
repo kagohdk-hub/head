@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "id": "ingredients",
+      "label": "材料がある",
+      "status": "achieved",
+      "requires": []
+    },
+    {
+      "id": "tools",
+      "label": "調理器具がある",
+      "status": "achieved",
+      "requires": []
+    },
+    {
+      "id": "money",
+      "label": "手持ちのお金がある",
+      "status": "achieved",
+      "requires": []
+    },
+    {
+      "id": "can_cook",
+      "label": "カレーを作れる",
+      "status": "wip",
+      "requires": [
+        [
+          "ingredients",
+          "tools"
+        ]
+      ]
+    },
+    {
+      "id": "can_go_shop",
+      "label": "カレー屋に行ける",
+      "status": "achieved",
+      "requires": [
+        [
+          "money"
+        ]
+      ]
+    },
+    {
+      "id": "can_eat",
+      "label": "カレーを食べられる",
+      "status": "target",
+      "requires": [
+        [
+          "can_cook"
+        ],
+        [
+          "can_go_shop"
+        ]
+      ],
+      "isGoal": true
+    }
+  ]
+}
