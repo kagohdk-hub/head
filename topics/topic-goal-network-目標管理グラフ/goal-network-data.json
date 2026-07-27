@@ -19,8 +19,19 @@
       "requires": []
     },
     {
-      "id": "can_cook",
+      "id": "can_cook_curry",
       "label": "カレーを作れる",
+      "status": "wip",
+      "requires": [
+        [
+          "ingredients",
+          "tools"
+        ]
+      ]
+    },
+    {
+      "id": "can_cook_stew",
+      "label": "シチューを作れる",
       "status": "wip",
       "requires": [
         [
@@ -37,7 +48,8 @@
         [
           "money"
         ]
-      ]
+      ],
+      "isGoal": true
     },
     {
       "id": "can_eat",
@@ -45,7 +57,7 @@
       "status": "target",
       "requires": [
         [
-          "can_cook"
+          "can_cook_curry"
         ],
         [
           "can_go_shop"
