@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>到達ステータス・ネットワーク</title>
+<style>
+  :root{
+    --bg: #211D1A;
+    --bg-grid: #262019;
+    --panel: #2A2521;
+    --panel-border: #3A332C;
+    --line: #55483C;
+    --line-dim: #3A332C;
+    --text: #EDE6DB;
+    --text-dim: #96897A;
+    --text-faint: #5E5347;
+    --achieved: #5B8A76;
+    --achieved-dim: #35473E;
+    --wip: #D8A34C;
+    --wip-dim: #4A3F27;
+    --target: #6E93B8;
+    --target-dim: #2E3C48;
+    --locked: #4A433C;
+    --goal-ring: #E4C25E;
+    --danger: #C06A5A;
+    --mono: ui-monospace, "SF Mono", Consolas, Menlo, monospace;
+    --sans: -apple-system, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+  #app{ display:flex; width:100%; height:100vh; }
+
+  /* ---------- グラフ領域 ---------- */
+  #graph-wrap{
+    position:relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    background:
+      radial-gradient(circle at 1px 1px, var(--bg-grid) 1px, transparent 1px) 0 0/28px 28px,
+      var(--bg);
+    overflow: hidden;
+    cursor: grab;
+  }
+  #graph-wrap.dragging{ cursor: grabbing; }
+  #graph-svg{ display:block; width:100%; height:100%; }
+
+  .edge{ fill:none; stroke: var(--line); stroke-width: 1.6; opacity: 0.55; transition: opacity .15s, stroke .15s; }
+  .edge.or{ stroke-dasharray: 2 5; }
+  .edge.dim{ opacity: 0.08; }
+  .edge.lit{ opacity: 0.95; stroke: var(--text-dim); }
+
+  .node{ cursor:pointer; }
+  .node .halo{ opacity:0; transition: opacity .15s; }
+  .node.selected .halo{ opacity:1; }
+  .node-circle{ stroke-width: 2; transition: stroke-width .15s, opacity .15s; }
+  .node.dim .node-circle, .node.dim .node-label{ opacity: 0.16; }
+  .node.dim .goal-ring{ opacity: 0.16; }
+  .node-label{
+    font-family: var(--sans);
+    font-size: 12.5px;
+    fill: var(--text);
+    text-anchor: middle;
+    pointer-events: none;
+    transition: opacity .15s;
+  }
+  .node-sub{
+    font-family: var(--mono);
+    font-size: 9px;
+    fill: var(--text-faint);
+    text-anchor: middle;
+    pointer-events: none;
+    letter-spacing: 0.03em;
+  }
+  .goal-ring{ fill:none; stroke: var(--goal-ring); stroke-width: 1.4; stroke-dasharray: 1.5 3.5; }
+
+  /* ---------- 上部ツールバー ---------- */
+  #toolbar{
+    position:absolute; top:14px; left:14px; right:14px;
+    display:flex; align-items:center; gap:10px;
+    pointer-events:none;
+    z-index: 5;
+  }
+  #title{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    pointer-events:none;
+  }
+  .spacer{ flex:1; }
+  .btn{
+    pointer-events:auto;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text-dim);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .btn:hover{ border-color: var(--text-faint); color: var(--text); }
+
+  /* ---------- 凡例 ---------- */
+  #legend{
+    position:absolute; left:14px; bottom:14px;
+    display:flex; flex-direction:column; gap:6px;
+    background: var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    pointer-events:none;
+  }
+  .legend-row{ display:flex; align-items:center; gap:8px; }
+  .legend-dot{ width:10px; height:10px; border-radius:50%; border:2px solid; flex:0 0 auto; }
+  .legend-line{ width:18px; height:0; border-top:1.6px solid var(--line); flex:0 0 auto; }
+  .legend-line.or{ border-top-style:dashed; }
+
+  /* ---------- サイドパネル ---------- */
+  #panel{
+    flex: 0 0 300px;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-border);
+    padding: 20px;
+    overflow-y: auto;
+    display:flex; flex-direction:column; gap:16px;
+  }
+  #panel h2{ font-size:15px; margin:0 0 2px; font-weight:600; }
+  #panel .empty{ color: var(--text-faint); font-size:13px; line-height:1.7; }
+  .field-label{ font-family: var(--mono); font-size:10px; color: var(--text-faint); letter-spacing:0.06em; margin-bottom:6px; }
+  .status-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; }
+  .status-btn{
+    border:1px solid var(--panel-border); background: transparent; color: var(--text-dim);
+    font-family: var(--sans); font-size:12px; padding:8px 6px; border-radius:6px; cursor:pointer;
+    display:flex; align-items:center; gap:6px; justify-content:center;
+    transition: all .12s;
+  }
+  .status-btn .dot{ width:8px; height:8px; border-radius:50%; border:2px solid; }
+  .status-btn.active{ color: var(--text); border-color: var(--text-faint); background: rgba(255,255,255,0.03); }
+  .goal-toggle{
+    border:1px solid var(--panel-border); background: transparent; color: var(--text-dim);
+    font-family: var(--sans); font-size:12px; padding:8px 10px; border-radius:6px; cursor:pointer;
+    text-align:left;
+  }
+  .goal-toggle.active{ color: var(--goal-ring); border-color: var(--goal-ring); }
+  .req-list{ display:flex; flex-direction:column; gap:6px; font-size:12.5px; }
+  .req-group{ padding:8px 10px; background: rgba(255,255,255,0.02); border:1px solid var(--panel-border); border-radius:6px; }
+  .req-group .or-label{ font-family: var(--mono); font-size:9.5px; color: var(--text-faint); margin-bottom:4px; }
+  .req-item{ display:flex; align-items:center; gap:6px; padding:2px 0; }
+  .req-item .dot{ width:7px; height:7px; border-radius:50%; border:1.5px solid; flex:0 0 auto; }
+  .unlocks-list{ display:flex; flex-direction:column; gap:4px; font-size:12.5px; color: var(--text-dim); }
+  .unlocks-list div{ cursor:pointer; }
+  .unlocks-list div:hover{ color: var(--text); }
+  #json-editor{
+    width:100%; height: 220px; background:#1B1713; color: var(--text);
+    font-family: var(--mono); font-size:11.5px; border:1px solid var(--panel-border); border-radius:6px;
+    padding:10px; resize: vertical;
+  }
+  #json-msg{ font-size:11px; color: var(--text-faint); min-height: 14px; }
+  #json-msg.error{ color: var(--danger); }
+  #edit-actions{ display:flex; gap:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="graph-wrap">
+    <svg id="graph-svg"></svg>
+    <div id="toolbar">
+      <div id="title">STATUS NETWORK</div>
+      <div class="spacer"></div>
+      <button class="btn" id="btn-edit">データを編集</button>
+      <button class="btn" id="btn-reset">例をリセット</button>
+    </div>
+    <div id="legend">
+      <div class="legend-row"><span class="legend-dot" style="border-color:var(--locked); background:transparent;"></span>未着手</div>
+      <div class="legend-row"><span class="legend-dot" style="border-color:var(--target); background:transparent;"></span>次に到達できる場所</div>
+      <div class="legend-row"><span class="legend-dot" style="border-color:var(--wip); background:var(--wip-dim);"></span>今取り組み中</div>
+      <div class="legend-row"><span class="legend-dot" style="border-color:var(--achieved); background:var(--achieved-dim);"></span>到達済み</div>
+      <div class="legend-row"><span class="legend-line"></span>AND(すべて必要)</div>
+      <div class="legend-row"><span class="legend-line or"></span>OR(いずれかでよい)</div>
+    </div>
+  </div>
+  <div id="panel">
+    <div id="panel-content">
+      <div class="empty">ノードをクリックすると詳細が表示されます。ステータスの変更や、ゴール指定もここから行えます。</div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript" src='./goal-network.js'></script>
+</body>
+</html>
