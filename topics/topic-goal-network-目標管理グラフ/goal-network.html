@@ -54,8 +54,12 @@
   .edge.or{ stroke-dasharray: 2 5; }
   .edge.dim{ opacity: 0.08; }
   .edge.lit{ opacity: 0.95; stroke: var(--text-dim); }
+  .edge.selected{ stroke: var(--danger); opacity: 1; stroke-width: 2.4; }
+  .edge-hit{ fill:none; stroke: transparent; stroke-width: 16; cursor: pointer; }
+  .connect-preview{ fill:none; stroke: var(--goal-ring); stroke-width: 1.6; stroke-dasharray: 3 4; opacity: 0.85; pointer-events: none; }
 
-  .node{ cursor:pointer; }
+  .node{ cursor:grab; }
+  .node:active{ cursor:grabbing; }
   .node .halo{ opacity:0; transition: opacity .15s; }
   .node.selected .halo{ opacity:1; }
   .node-circle{ stroke-width: 2; transition: stroke-width .15s, opacity .15s; }
@@ -135,6 +139,11 @@
     display:flex; flex-direction:column; gap:16px;
   }
   #panel h2{ font-size:15px; margin:0 0 2px; font-weight:600; }
+  #label-input{
+    width:100%; background:#1B1713; color: var(--text); border:1px solid var(--panel-border);
+    border-radius:6px; padding:8px 10px; font-size:14px; font-family: var(--sans);
+  }
+  #label-input:focus{ outline:none; border-color: var(--text-faint); }
   #panel .empty{ color: var(--text-faint); font-size:13px; line-height:1.7; }
   .field-label{ font-family: var(--mono); font-size:10px; color: var(--text-faint); letter-spacing:0.06em; margin-bottom:6px; }
   .status-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:6px; }
@@ -177,6 +186,7 @@
     <div id="toolbar">
       <div id="title">STATUS NETWORK</div>
       <div class="spacer"></div>
+      <button class="btn" id="btn-recompute">配置を再計算</button>
       <button class="btn" id="btn-import">読み込み</button>
       <button class="btn" id="btn-export">書き出し</button>
       <button class="btn" id="btn-edit">データを編集</button>
@@ -190,6 +200,11 @@
       <div class="legend-row"><span class="legend-dot" style="border-color:var(--achieved); background:var(--achieved-dim);"></span>到達済み</div>
       <div class="legend-row"><span class="legend-line"></span>AND(すべて必要)</div>
       <div class="legend-row"><span class="legend-line or"></span>OR(いずれかでよい)</div>
+      <div style="height:1px; background:var(--panel-border); margin:2px 0;"></div>
+      <div class="legend-row" style="font-family:var(--mono); font-size:10px;">空クリック:追加</div>
+      <div class="legend-row" style="font-family:var(--mono); font-size:10px;">ドラッグ:移動</div>
+      <div class="legend-row" style="font-family:var(--mono); font-size:10px;">Shift+ドラッグ:接続</div>
+      <div class="legend-row" style="font-family:var(--mono); font-size:10px;">選択してDelete:削除</div>
     </div>
   </div>
   <div id="panel">
@@ -222,7 +237,6 @@ const STATUS_FILL_VAR  = { locked:null, target:null, wip:'--wip-dim', achieved:'
 
 let data = null;
 let selectedId = null;
-let layout = null; // {nodes:[{...node,x,y,layer}], layerGap, radius}
 let pan = {x:0, y:0};
 let zoom = 1;
 
@@ -231,6 +245,9 @@ const panelContent = document.getElementById('panel-content');
 const graphWrap = document.getElementById('graph-wrap');
 
 // ---------- 永続化 ----------
+const CANVAS_SIZE = 2400;
+const NODE_RADIUS = 22;
+
 async function loadData(){
   try{
     const res = await window.storage.get(STORAGE_KEY);
@@ -251,17 +268,16 @@ function saveData(){
   }, 250);
 }
 
-// ---------- レイアウト計算(一度だけ・静的) ----------
-function computeLayout(){
+// ---------- 自動配置(中心放射状)。手動配置がない場合のみ、または再計算時に使用 ----------
+function computeAutoPositions(){
   const nodesById = {};
   data.nodes.forEach(n => nodesById[n.id] = n);
 
-  // 層(layer)をメモ化して算出。循環があれば無限再帰を避ける。
   const layerCache = {};
   const visiting = new Set();
   function getLayer(id){
     if(layerCache[id] !== undefined) return layerCache[id];
-    if(visiting.has(id)) return 0; // 循環防止フォールバック
+    if(visiting.has(id)) return 0;
     visiting.add(id);
     const n = nodesById[id];
     let layer = 0;
@@ -289,8 +305,7 @@ function computeLayout(){
     (byLayer[l] = byLayer[l] || []).push(n.id);
   });
 
-  // 初期順序 → バリセンター法で交差を軽減(2パス)
-  let order = {}; // id -> index within its layer
+  let order = {};
   Object.keys(byLayer).forEach(l=>{
     byLayer[l].forEach((id,i)=> order[id]=i);
   });
@@ -303,10 +318,8 @@ function computeLayout(){
         const n = nodesById[id];
         let neighbors = [];
         if(fromLowToHigh){
-          // 自分より下の層(依存先)を見る
           (n.requires||[]).forEach(g=> g.forEach(dep=>{ if(nodesById[dep]) neighbors.push(order[dep]); }));
         } else {
-          // 自分より上の層(自分に依存する子)を見る
           data.nodes.forEach(other=>{
             (other.requires||[]).forEach(g=>{ if(g.includes(id)) neighbors.push(order[other.id]); });
           });
@@ -323,13 +336,8 @@ function computeLayout(){
   barycenterPass(false);
   barycenterPass(true);
 
-  const radius = 22;
-  const baseRadius = 90;   // 中心(layer0)のリング半径。単一ルートに近づけたい場合は小さめに
-  const ringGap = 118;     // リング間の間隔
-  const padding = 90;
-
-  // 各リングの周方向間隔から、そのリングに必要な最小半径を逆算し、
-  // 内側リングが窮屈にならないようにする
+  const baseRadius = 90;
+  const ringGap = 118;
   const minArcPerNode = 46;
   const ringRadius = {};
   for(let l=0; l<=maxLayer; l++){
@@ -338,41 +346,68 @@ function computeLayout(){
     ringRadius[l] = Math.max(baseRadius + l*ringGap, l===0 ? baseRadius : (ringRadius[l-1]||baseRadius) + Math.max(ringGap, neededByArc*0.6));
   }
 
-  const cx = 0, cy = 0;
-  const positioned = data.nodes.map(n=>{
+  const CENTER = CANVAS_SIZE/2;
+  const result = {};
+  data.nodes.forEach(n=>{
     const l = layerCache[n.id];
     const ids = byLayer[l];
     const idx = ids.indexOf(n.id);
     const count = ids.length;
     const r = (count === 1 && l === 0) ? 0 : ringRadius[l];
-    const angle = (idx / count) * Math.PI * 2 - Math.PI/2; // 上(12時方向)始まり
-    const x = cx + r * Math.cos(angle);
-    const y = cy + r * Math.sin(angle);
-    return Object.assign({}, n, { x, y, layer: l, angle, r });
+    const angle = (idx / count) * Math.PI * 2 - Math.PI/2;
+    result[n.id] = { x: CENTER + r*Math.cos(angle), y: CENTER + r*Math.sin(angle) };
   });
+  return result;
+}
 
-  const maxR = Math.max(baseRadius, ...positioned.map(n=>n.r)) + padding + 40;
-  const svgWidth = maxR*2, svgHeight = maxR*2;
-  // 中心を画面中央に合わせるオフセット
-  positioned.forEach(n=>{ n.x += maxR; n.y += maxR; });
+function autoLayoutPositions(forceAll){
+  const auto = computeAutoPositions();
+  data.nodes.forEach(n=>{
+    if(forceAll || n.x === undefined || n.y === undefined || n.x === null || n.y === null){
+      const p = auto[n.id];
+      if(p){ n.x = p.x; n.y = p.y; }
+    }
+  });
+}
 
-  return { nodes: positioned, width: svgWidth, height: svgHeight, radius };
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let selectedEdge = null;   // {fromId, groupIndex, depId}
+let draggingNodeId = null;
+let connecting = null;     // {fromId, x, y}
+let connectMouse = {x:0, y:0};
+let vgroup = null;
+let rafPending = false;
+
+function scheduleRender(){
+  if(rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(()=>{ rafPending = false; render(); });
+}
+
+function screenToLocal(clientX, clientY){
+  if(!vgroup) return {x:0,y:0};
+  const pt = svg.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const ctm = vgroup.getScreenCTM();
+  if(!ctm) return {x:0,y:0};
+  const loc = pt.matrixTransform(ctm.inverse());
+  return {x: loc.x, y: loc.y};
 }
 
 // ---------- 描画 ----------
 function render(){
-  layout = computeLayout();
-  svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
+  svg.setAttribute('viewBox', `0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`);
   svg.innerHTML = '';
 
   const byId = {};
-  layout.nodes.forEach(n=> byId[n.id]=n);
+  data.nodes.forEach(n=> byId[n.id]=n);
 
-  // 選択中ノードのハイライト対象(祖先・子孫)を計算
   let litSet = null;
   if(selectedId){
     litSet = new Set([selectedId]);
-    // 祖先(依存先)をたどる
     (function walkUp(id){
       const n = byId[id];
       if(!n) return;
@@ -380,9 +415,8 @@ function render(){
         if(!litSet.has(dep)){ litSet.add(dep); walkUp(dep); }
       }));
     })(selectedId);
-    // 子孫(自分に依存するもの)をたどる
     (function walkDown(id){
-      layout.nodes.forEach(n=>{
+      data.nodes.forEach(n=>{
         (n.requires||[]).forEach(g=>{
           if(g.includes(id) && !litSet.has(n.id)){
             litSet.add(n.id);
@@ -393,36 +427,46 @@ function render(){
     })(selectedId);
   }
 
-  // エッジ描画
+  const root = document.createElementNS('http://www.w3.org/2000/svg','g');
+
   const edgeLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-  layout.nodes.forEach(n=>{
-    (n.requires||[]).forEach(group=>{
+  data.nodes.forEach(n=>{
+    (n.requires||[]).forEach((group, gi)=>{
       const isOr = (n.requires.length > 1);
       group.forEach(depId=>{
         const dep = byId[depId];
-        if(!dep) return;
-        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        if(!dep || dep.x===undefined) return;
         const dx = n.x - dep.x, dy = n.y - dep.y;
         const dist = Math.max(1, Math.hypot(dx, dy));
         const ux = dx/dist, uy = dy/dist;
-        const x1 = dep.x + ux*layout.radius, y1 = dep.y + uy*layout.radius;
-        const x2 = n.x - ux*layout.radius, y2 = n.y - uy*layout.radius;
+        const x1 = dep.x + ux*NODE_RADIUS, y1 = dep.y + uy*NODE_RADIUS;
+        const x2 = n.x - ux*NODE_RADIUS, y2 = n.y - uy*NODE_RADIUS;
         const mx = (x1+x2)/2, my = (y1+y2)/2;
-        path.setAttribute('d', `M ${x1} ${y1} Q ${mx} ${my}, ${x2} ${y2}`);
+        const d = `M ${x1} ${y1} Q ${mx} ${my}, ${x2} ${y2}`;
+
+        const isSelected = selectedEdge && selectedEdge.fromId===n.id && selectedEdge.groupIndex===gi && selectedEdge.depId===depId;
+
+        const visible = document.createElementNS('http://www.w3.org/2000/svg','path');
+        visible.setAttribute('d', d);
         let cls = 'edge' + (isOr ? ' or' : '');
-        if(litSet){
-          cls += (litSet.has(n.id) && litSet.has(depId)) ? ' lit' : ' dim';
-        }
-        path.setAttribute('class', cls);
-        edgeLayer.appendChild(path);
+        if(isSelected) cls += ' selected';
+        else if(litSet) cls += (litSet.has(n.id) && litSet.has(depId)) ? ' lit' : ' dim';
+        visible.setAttribute('class', cls);
+        edgeLayer.appendChild(visible);
+
+        const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+        hit.setAttribute('d', d);
+        hit.setAttribute('class', 'edge-hit');
+        hit.addEventListener('click', (e)=>{ e.stopPropagation(); selectEdge(n.id, gi, depId); });
+        edgeLayer.appendChild(hit);
       });
     });
   });
-  svg.appendChild(edgeLayer);
+  root.appendChild(edgeLayer);
 
-  // ノード描画
   const nodeLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-  layout.nodes.forEach(n=>{
+  data.nodes.forEach(n=>{
+    if(n.x===undefined || n.y===undefined) return;
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
     let cls = 'node';
     if(n.id === selectedId) cls += ' selected';
@@ -433,13 +477,13 @@ function render(){
     if(n.isGoal){
       const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
       ring.setAttribute('class','goal-ring');
-      ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', layout.radius+7);
+      ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', NODE_RADIUS+7);
       g.appendChild(ring);
     }
 
     const halo = document.createElementNS('http://www.w3.org/2000/svg','circle');
     halo.setAttribute('class','halo');
-    halo.setAttribute('cx', n.x); halo.setAttribute('cy', n.y); halo.setAttribute('r', layout.radius+5);
+    halo.setAttribute('cx', n.x); halo.setAttribute('cy', n.y); halo.setAttribute('r', NODE_RADIUS+5);
     halo.setAttribute('fill','none');
     halo.setAttribute('stroke','var(--text)');
     halo.setAttribute('stroke-width','1');
@@ -447,7 +491,7 @@ function render(){
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
     circle.setAttribute('class','node-circle');
-    circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', layout.radius);
+    circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', NODE_RADIUS);
     const strokeVar = STATUS_COLOR_VAR[n.status] || '--locked';
     const fillVar = STATUS_FILL_VAR[n.status];
     circle.setAttribute('stroke', `var(${strokeVar})`);
@@ -462,37 +506,134 @@ function render(){
     if(showLabel){
       const label = document.createElementNS('http://www.w3.org/2000/svg','text');
       label.setAttribute('class','node-label');
-      label.setAttribute('x', n.x); label.setAttribute('y', n.y + layout.radius + 20);
+      label.setAttribute('x', n.x); label.setAttribute('y', n.y + NODE_RADIUS + 20);
       label.textContent = n.label;
       g.appendChild(label);
 
       const sub = document.createElementNS('http://www.w3.org/2000/svg','text');
       sub.setAttribute('class','node-sub');
-      sub.setAttribute('x', n.x); sub.setAttribute('y', n.y + layout.radius + 33);
+      sub.setAttribute('x', n.x); sub.setAttribute('y', n.y + NODE_RADIUS + 33);
       sub.textContent = STATUS_LABEL[n.status] || n.status;
       g.appendChild(sub);
     }
 
+    g.addEventListener('mousedown', (e)=>{
+      e.stopPropagation();
+      if(e.shiftKey){
+        connecting = { fromId: n.id, x: n.x, y: n.y };
+        connectMouse = { x: n.x, y: n.y };
+      } else {
+        draggingNodeId = n.id;
+      }
+    });
     g.addEventListener('click', (e)=>{ e.stopPropagation(); selectNode(n.id); });
     nodeLayer.appendChild(g);
   });
-  svg.appendChild(nodeLayer);
+  root.appendChild(nodeLayer);
 
-  applyTransform();
+  if(connecting){
+    const preview = document.createElementNS('http://www.w3.org/2000/svg','path');
+    preview.setAttribute('d', `M ${connecting.x} ${connecting.y} L ${connectMouse.x} ${connectMouse.y}`);
+    preview.setAttribute('class','connect-preview');
+    root.appendChild(preview);
+  }
+
+  svg.appendChild(root);
+  vgroup = root;
+  updateTransform();
+}
+
+function updateTransform(){
+  if(!vgroup) return;
+  vgroup.setAttribute('transform', `translate(${pan.x},${pan.y}) scale(${zoom})`);
 }
 
 function selectNode(id){
+  selectedEdge = null;
   selectedId = id;
   render();
   renderPanel();
 }
 
-svg.addEventListener('click', ()=>{ selectedId=null; render(); renderPanel(); });
+function selectEdge(fromId, groupIndex, depId){
+  selectedId = null;
+  selectedEdge = { fromId, groupIndex, depId };
+  render();
+  renderPanel();
+}
+
+function deleteNode(id){
+  data.nodes = data.nodes.filter(n=>n.id!==id);
+  data.nodes.forEach(n=>{
+    n.requires = (n.requires||[]).map(g=> g.filter(d=>d!==id)).filter(g=>g.length>0);
+  });
+  if(selectedId===id) selectedId=null;
+  saveData();
+  render(); renderPanel();
+}
+
+function deleteEdge(fromId, groupIndex, depId){
+  const n = data.nodes.find(x=>x.id===fromId);
+  if(!n || !n.requires || !n.requires[groupIndex]) return;
+  n.requires[groupIndex] = n.requires[groupIndex].filter(d=>d!==depId);
+  n.requires = n.requires.filter(g=>g.length>0);
+  saveData();
+  render(); renderPanel();
+}
+
+function addRequirement(fromId, toId){
+  if(fromId === toId) return;
+  const n = data.nodes.find(x=>x.id===fromId);
+  if(!n) return;
+  n.requires = n.requires || [];
+  const exists = n.requires.some(g=>g.includes(toId));
+  if(exists) return;
+  n.requires.push([toId]);
+  saveData();
+  render(); renderPanel();
+}
+
+function createNodeAt(x, y){
+  const id = 'node_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  const newNode = { id, label:'新規ノード', status:'locked', requires:[], x, y };
+  data.nodes.push(newNode);
+  selectedEdge = null;
+  selectedId = id;
+  saveData();
+  render(); renderPanel();
+}
 
 // ---------- パネル ----------
 function renderPanel(){
+  if(selectedEdge){
+    const from = data.nodes.find(x=>x.id===selectedEdge.fromId);
+    const dep = data.nodes.find(x=>x.id===selectedEdge.depId);
+    panelContent.innerHTML = `
+      <div><h2>関係</h2></div>
+      <div class="req-group">
+        <div style="font-size:13px;">${from ? escapeHtml(from.label) : '?'}</div>
+        <div style="color:var(--text-faint); font-size:11px; margin:6px 0;">↑ 前提として必要</div>
+        <div style="font-size:13px;">${dep ? escapeHtml(dep.label) : '?'}</div>
+      </div>
+      <button class="btn" id="delete-edge-btn" style="color:var(--danger); border-color:var(--danger);">この関係を削除</button>
+    `;
+    document.getElementById('delete-edge-btn').addEventListener('click', ()=>{
+      deleteEdge(selectedEdge.fromId, selectedEdge.groupIndex, selectedEdge.depId);
+      selectedEdge = null;
+      render(); renderPanel();
+    });
+    return;
+  }
+
   if(!selectedId){
-    panelContent.innerHTML = `<div class="empty">ノードをクリックすると詳細が表示されます。ステータスの変更や、ゴール指定もここから行えます。</div>`;
+    panelContent.innerHTML = `<div class="empty">
+      ノードをクリックすると詳細が表示されます。<br><br>
+      ・空白をクリック → ノード作成<br>
+      ・ノードをドラッグ → 移動<br>
+      ・Shift+ドラッグ → 別ノードへ関係作成<br>
+      ・選択してDelete → 削除<br>
+      ・Escape → 選択解除
+    </div>`;
     return;
   }
   const n = data.nodes.find(x=>x.id===selectedId);
@@ -507,12 +648,12 @@ function renderPanel(){
 
   let reqHtml = '';
   if(n.requires && n.requires.length){
-    reqHtml = n.requires.map(group=>{
+    reqHtml = n.requires.map((group)=>{
       const items = group.map(depId=>{
         const dep = data.nodes.find(x=>x.id===depId);
         if(!dep) return '';
         return `<div class="req-item" data-jump="${depId}">
-          <span class="dot" style="border-color:var(${STATUS_COLOR_VAR[dep.status]})"></span>${dep.label}
+          <span class="dot" style="border-color:var(${STATUS_COLOR_VAR[dep.status]})"></span>${escapeHtml(dep.label)}
         </div>`;
       }).join('');
       return `<div class="req-group">
@@ -526,13 +667,13 @@ function renderPanel(){
 
   const unlocks = data.nodes.filter(other => (other.requires||[]).some(g=>g.includes(n.id)));
   const unlocksHtml = unlocks.length
-    ? unlocks.map(u=>`<div data-jump="${u.id}">→ ${u.label}</div>`).join('')
+    ? unlocks.map(u=>`<div data-jump="${u.id}">→ ${escapeHtml(u.label)}</div>`).join('')
     : `<div style="color:var(--text-faint)">なし</div>`;
 
   panelContent.innerHTML = `
     <div>
-      <h2>${n.label}</h2>
-      <div style="font-family:var(--mono); font-size:10px; color:var(--text-faint);">${n.id}</div>
+      <input type="text" id="label-input" value="${escapeHtml(n.label)}">
+      <div style="font-family:var(--mono); font-size:10px; color:var(--text-faint); margin-top:4px;">${n.id}</div>
     </div>
     <div>
       <div class="field-label">ステータス</div>
@@ -551,7 +692,15 @@ function renderPanel(){
       <div class="field-label">これが開ける先</div>
       <div class="unlocks-list">${unlocksHtml}</div>
     </div>
+    <button class="btn" id="delete-node-btn" style="color:var(--danger); border-color:var(--danger);">このノードを削除</button>
   `;
+
+  const labelInput = document.getElementById('label-input');
+  labelInput.addEventListener('change', ()=>{
+    n.label = labelInput.value.trim() || '(無題)';
+    saveData();
+    render(); renderPanel();
+  });
 
   panelContent.querySelectorAll('.status-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -569,46 +718,70 @@ function renderPanel(){
   panelContent.querySelectorAll('[data-jump]').forEach(el=>{
     el.addEventListener('click', ()=> selectNode(el.getAttribute('data-jump')));
   });
+  const delBtn = document.getElementById('delete-node-btn');
+  if(delBtn) delBtn.addEventListener('click', ()=>{
+    if(confirm(`「${n.label}」を削除しますか?`)) deleteNode(n.id);
+  });
 }
 
-// ---------- パン・ズーム(静的変換。継続的な物理計算はしない) ----------
-function applyTransform(){
-  const g = svg.querySelector('#viewport-group');
-}
-let vgroup;
-function ensureViewportGroup(){
-  // 全描画要素を1つのgでラップしてtransformする
-  const children = Array.from(svg.childNodes);
-  vgroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  vgroup.setAttribute('id','viewport-group');
-  children.forEach(c=> vgroup.appendChild(c));
-  svg.appendChild(vgroup);
-}
-const _origRender = render;
-render = function(){
-  _origRender();
-  ensureViewportGroup();
-  updateTransform();
-};
-function updateTransform(){
-  if(!vgroup) return;
-  vgroup.setAttribute('transform', `translate(${pan.x},${pan.y}) scale(${zoom})`);
-}
+// ---------- パン・ズーム・ドラッグ・接続・作成 ----------
+let panActive = false, panStart = {x:0,y:0}, panOrigin = {x:0,y:0};
+let clickCandidate = null;
 
-let isDragging = false, dragStart = {x:0,y:0}, panStart = {x:0,y:0};
 graphWrap.addEventListener('mousedown', (e)=>{
-  isDragging = true;
+  if(e.target.closest && e.target.closest('.node')) return;
+  panActive = true;
   graphWrap.classList.add('dragging');
-  dragStart = {x:e.clientX, y:e.clientY};
-  panStart = {x:pan.x, y:pan.y};
+  panStart = {x:e.clientX, y:e.clientY};
+  panOrigin = {x:pan.x, y:pan.y};
+  clickCandidate = {x:e.clientX, y:e.clientY};
 });
+
 window.addEventListener('mousemove', (e)=>{
-  if(!isDragging) return;
-  pan.x = panStart.x + (e.clientX - dragStart.x);
-  pan.y = panStart.y + (e.clientY - dragStart.y);
-  updateTransform();
+  if(panActive){
+    const dx = e.clientX - panStart.x, dy = e.clientY - panStart.y;
+    if(Math.hypot(dx,dy) > 4) clickCandidate = null;
+    pan.x = panOrigin.x + dx;
+    pan.y = panOrigin.y + dy;
+    updateTransform();
+  }
+  if(draggingNodeId){
+    const p = screenToLocal(e.clientX, e.clientY);
+    const n = data.nodes.find(x=>x.id===draggingNodeId);
+    if(n){ n.x = p.x; n.y = p.y; scheduleRender(); }
+  }
+  if(connecting){
+    connectMouse = screenToLocal(e.clientX, e.clientY);
+    scheduleRender();
+  }
 });
-window.addEventListener('mouseup', ()=>{ isDragging=false; graphWrap.classList.remove('dragging'); });
+
+window.addEventListener('mouseup', (e)=>{
+  if(panActive){
+    panActive = false;
+    graphWrap.classList.remove('dragging');
+    if(clickCandidate){
+      const p = screenToLocal(clickCandidate.x, clickCandidate.y);
+      createNodeAt(p.x, p.y);
+    }
+    clickCandidate = null;
+  }
+  if(draggingNodeId){
+    saveData();
+    draggingNodeId = null;
+  }
+  if(connecting){
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const nodeEl = target && target.closest && target.closest('.node');
+    if(nodeEl){
+      const targetId = nodeEl.getAttribute('data-id');
+      if(targetId) addRequirement(connecting.fromId, targetId);
+    }
+    connecting = null;
+    scheduleRender();
+  }
+});
+
 graphWrap.addEventListener('wheel', (e)=>{
   e.preventDefault();
   const delta = e.deltaY > 0 ? -0.08 : 0.08;
@@ -616,11 +789,38 @@ graphWrap.addEventListener('wheel', (e)=>{
   updateTransform();
 }, { passive:false });
 
+document.addEventListener('keydown', (e)=>{
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if(e.key === 'Escape'){
+    selectedId = null; selectedEdge = null; connecting = null;
+    render(); renderPanel();
+  } else if(e.key === 'Delete' || e.key === 'Backspace'){
+    if(selectedId){
+      e.preventDefault();
+      const n = data.nodes.find(x=>x.id===selectedId);
+      if(n && confirm(`「${n.label}」を削除しますか?`)) deleteNode(selectedId);
+    } else if(selectedEdge){
+      e.preventDefault();
+      deleteEdge(selectedEdge.fromId, selectedEdge.groupIndex, selectedEdge.depId);
+      selectedEdge = null;
+      render(); renderPanel();
+    }
+  }
+});
+
 // ---------- ツールバー ----------
 document.getElementById('btn-reset').addEventListener('click', async ()=>{
   if(!confirm('例のデータにリセットします。よろしいですか?')) return;
   data = JSON.parse(JSON.stringify(DEFAULT_DATA));
-  selectedId = null;
+  autoLayoutPositions(false);
+  selectedId = null; selectedEdge = null;
+  saveData();
+  render(); renderPanel();
+});
+
+document.getElementById('btn-recompute').addEventListener('click', ()=>{
+  autoLayoutPositions(true);
   saveData();
   render(); renderPanel();
 });
@@ -649,7 +849,8 @@ fileInput.addEventListener('change', (e)=>{
       const parsed = JSON.parse(reader.result);
       if(!parsed.nodes || !Array.isArray(parsed.nodes)) throw new Error('nodes 配列が必要です');
       data = parsed;
-      selectedId = null;
+      autoLayoutPositions(false);
+      selectedId = null; selectedEdge = null;
       saveData();
       render(); renderPanel();
     }catch(err){
@@ -661,13 +862,13 @@ fileInput.addEventListener('change', (e)=>{
 });
 
 document.getElementById('btn-edit').addEventListener('click', ()=>{
-  selectedId = null;
+  selectedId = null; selectedEdge = null;
   render();
   panelContent.innerHTML = `
     <div>
       <h2>データを編集</h2>
       <div style="font-size:11.5px; color:var(--text-faint); line-height:1.6; margin-top:4px;">
-        requires は [[AND条件...], [AND条件...]] の形。外側配列が複数あればOR、内側の複数idはAND。
+        requires は [[AND条件...], [AND条件...]] の形。外側配列が複数あればOR、内側の複数idはAND。x, y は座標(省略可、その場合は適用後に自動配置)。
       </div>
     </div>
     <textarea id="json-editor">${JSON.stringify(data, null, 2)}</textarea>
@@ -683,6 +884,7 @@ document.getElementById('btn-edit').addEventListener('click', ()=>{
       const parsed = JSON.parse(document.getElementById('json-editor').value);
       if(!parsed.nodes || !Array.isArray(parsed.nodes)) throw new Error('nodes 配列が必要です');
       data = parsed;
+      autoLayoutPositions(false);
       saveData();
       render(); renderPanel();
     }catch(e){
@@ -696,6 +898,7 @@ document.getElementById('btn-edit').addEventListener('click', ()=>{
 // ---------- 起動 ----------
 (async function init(){
   await loadData();
+  autoLayoutPositions(false);
   render();
   renderPanel();
 })();
