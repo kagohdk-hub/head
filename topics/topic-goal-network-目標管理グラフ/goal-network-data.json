@@ -64,30 +64,6 @@
         ]
       ],
       "isGoal": true
-    },
-    {
-      "id": "car_license_update_done",
-      "label": "免許更新_完了",
-      "status": "target",
-      "requires": [
-        ["car_license_update"]
-      ],
-      "isGoal": true
-    },
-    {
-      "id": "car_license_update",
-      "label": "免許更新_現地",
-      "status": "target",
-      "requires": [
-        [
-          "can_cook_curry"
-        ],
-        [
-          "can_go_shop"
-        ]
-      ],
-      "isGoal": true
     }
-
   ]
 }
