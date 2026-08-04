@@ -115,6 +115,19 @@ html,body{
   pointer-events:none;
 }
 .spacer{ flex:1; }
+.toolbar-input{
+  pointer-events:auto;
+  width: 220px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.toolbar-input::placeholder{ color: var(--text-faint); }
+.toolbar-input:focus{ outline:none; border-color: var(--text-faint); }
 .btn{
   pointer-events:auto;
   background: var(--panel);
@@ -128,6 +141,19 @@ html,body{
   transition: border-color .15s, color .15s;
 }
 .btn:hover{ border-color: var(--text-faint); color: var(--text); }
+.toggle-btn{ display:inline-flex; align-items:center; gap:8px; }
+.toggle-switch{
+  position:relative; width:34px; height:18px; border-radius:999px;
+  background: rgba(255,255,255,0.14); border:1px solid var(--panel-border);
+  transition: background .2s, border-color .2s; flex:0 0 auto;
+}
+.toggle-switch::before{
+  content:''; position:absolute; top:2px; left:2px; width:12px; height:12px;
+  border-radius:50%; background: var(--text-dim); transition: transform .2s, background .2s;
+}
+.toggle-btn.active{ color: var(--text); border-color: var(--target); }
+.toggle-btn.active .toggle-switch{ background: rgba(110,147,184,0.25); border-color: var(--target); }
+.toggle-btn.active .toggle-switch::before{ transform: translateX(16px); background: var(--target); }
 
 /* ---------- 凡例 ---------- */
 #legend{

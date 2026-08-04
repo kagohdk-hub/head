@@ -1,16 +1,19 @@
 (function(){
 
 const STORAGE_KEY = 'goal-network-data';
+const EXPORT_NAME_KEY = 'goal-network-export-name';
+const LABEL_MODE_KEY = 'goal-network-label-mode';
 
 const DEFAULT_DATA = {
   nodes: [
-    { id:'ingredients', label:'材料がある', status:'achieved', requires:[] },
-    { id:'tools',       label:'調理器具がある', status:'achieved', requires:[] },
-    { id:'money',       label:'手持ちのお金がある', status:'achieved', requires:[] },
-    { id:'can_cook',    label:'カレーを作れる', status:'wip', requires:[['ingredients','tools']] },
-    { id:'can_go_shop', label:'カレー屋に行ける', status:'achieved', requires:[['money']] },
-    { id:'can_eat',     label:'カレーを食べられる', status:'target', requires:[['can_cook'],['can_go_shop']], isGoal:true }
-  ]
+    { id:'a001', label:'材料がある', status:'achieved', requires:[] },
+    { id:'a002', label:'調理器具がある', status:'achieved', requires:[] },
+    { id:'a003', label:'手持ちのお金がある', status:'achieved', requires:[] },
+    { id:'a004', label:'カレーを作れる', status:'wip', requires:[['a001','a002']] },
+    { id:'a005', label:'カレー屋に行ける', status:'achieved', requires:[['a003']] },
+    { id:'a006', label:'カレーを食べられる', status:'target', requires:[['a004'],['a005']], isGoal:true }
+  ],
+  node_positions: {}
 };
 
 const STATUS_ORDER = ['locked','target','wip','achieved','avoid','problem'];
@@ -19,14 +22,94 @@ const STATUS_COLOR_VAR = { locked:'--locked', target:'--target', wip:'--wip', ac
 const STATUS_FILL_VAR  = { locked:'--locked-dim', target:'--target-dim', wip:'--wip-dim', achieved:'--achieved-dim', avoid:'#111111', problem:'#111111' };
 
 let data = null;
+let exportName = '';
 let selectedIds = [];
+
+function generateNodeId(existingIds = []){
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+  const pool = new Set(existingIds || []);
+  for(let attempt = 0; attempt < 1000; attempt++){
+    let id = '';
+    for(let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)];
+    if(!pool.has(id)) return id;
+  }
+  return `n${Date.now().toString(36).slice(-4)}`;
+}
+
+function migrateDataShape(raw){
+  const cloned = JSON.parse(JSON.stringify(raw || {}));
+  if(!cloned.nodes || !Array.isArray(cloned.nodes)) return cloned;
+
+  const idMap = {};
+  const usedIds = new Set();
+  const originalNodes = cloned.nodes.map((node)=> ({ ...node }));
+  originalNodes.forEach((node)=>{
+    const originalId = node && typeof node.id === 'string' ? node.id : '';
+    let nextId = originalId;
+    if(!/^[a-z0-9]{4}$/.test(nextId)){
+      nextId = generateNodeId(Array.from(usedIds));
+    } else if(usedIds.has(nextId)){
+      nextId = generateNodeId(Array.from(usedIds));
+    }
+    usedIds.add(nextId);
+    idMap[originalId] = nextId;
+  });
+
+  const migratedNodes = originalNodes.map((node)=>{
+    const originalId = node && typeof node.id === 'string' ? node.id : '';
+    const nextId = idMap[originalId] || originalId;
+    const nextNode = { ...node, id: nextId };
+    delete nextNode.x;
+    delete nextNode.y;
+    nextNode.requires = (nextNode.requires || []).map((group)=>{
+      if(!Array.isArray(group)) return [];
+      return group.map((depId)=> idMap[depId] || depId).filter(Boolean);
+    }).filter((group)=> group.length > 0);
+    return nextNode;
+  });
+
+  const migratedPositions = {};
+  originalNodes.forEach((node, index) => {
+    const nextNode = migratedNodes[index];
+    if(!nextNode) return;
+    const pos = {};
+    if(node && node.x !== undefined) pos.x = node.x;
+    if(node && node.y !== undefined) pos.y = node.y;
+    if(Object.keys(pos).length) migratedPositions[nextNode.id] = pos;
+  });
+
+  Object.entries(cloned.node_positions || {}).forEach(([oldId, pos]) => {
+    const nextId = idMap[oldId] || oldId;
+    if(pos && typeof pos === 'object' && (pos.x !== undefined || pos.y !== undefined)){
+      migratedPositions[nextId] = { x: pos.x, y: pos.y };
+    }
+  });
+
+  cloned.nodes = migratedNodes;
+  cloned.node_positions = migratedPositions;
+  return cloned;
+}
+
+function getNodePosition(nodeId){
+  if(!data || !data.node_positions || typeof data.node_positions !== 'object') return null;
+  const pos = data.node_positions[nodeId];
+  return pos && (pos.x !== undefined || pos.y !== undefined) ? { x: pos.x, y: pos.y } : null;
+}
+
+function setNodePosition(nodeId, x, y){
+  if(!data) return;
+  data.node_positions = data.node_positions || {};
+  data.node_positions[nodeId] = { x, y };
+}
 let selectedId = null;
 let pan = {x:0, y:0};
 let zoom = 1;
+let showAllLabels = false;
 
 const svg = document.getElementById('graph-svg');
 const panelContent = document.getElementById('panel-content');
 const graphWrap = document.getElementById('graph-wrap');
+const exportNameInput = document.getElementById('export-name-input');
 
 const CANVAS_SIZE = 2400;
 const NODE_RADIUS = 22;
@@ -40,11 +123,35 @@ async function loadData(){
   try{
     const res = await window.storage.get(STORAGE_KEY);
     if(res && res.value){
-      data = JSON.parse(res.value);
+      data = migrateDataShape(JSON.parse(res.value));
       return;
     }
   }catch(e){}
   data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  data = migrateDataShape(data);
+}
+
+function normalizeExportName(value){
+  const base = String(value || '').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').replace(/\.+$/, '');
+  return base || 'goal-network';
+}
+
+async function loadExportName(){
+  try{
+    const res = await window.storage.get(EXPORT_NAME_KEY);
+    if(res && res.value){ exportName = res.value; }
+  }catch(e){}
+  if(exportNameInput){
+    exportNameInput.value = exportName;
+  }
+}
+
+function saveExportName(){
+  const next = normalizeExportName(exportNameInput ? exportNameInput.value : exportName);
+  exportName = next;
+  if(exportNameInput){ exportNameInput.value = next; }
+  try{ window.storage.set(EXPORT_NAME_KEY, next); }
+  catch(e){ console.warn('save export name failed', e); }
 }
 
 let saveTimer = null;
@@ -54,6 +161,36 @@ function saveData(){
     try{ await window.storage.set(STORAGE_KEY, JSON.stringify(data)); }
     catch(e){ console.warn('save failed', e); }
   }, 250);
+}
+
+async function loadLabelMode(){
+  try{
+    const res = await window.storage.get(LABEL_MODE_KEY);
+    if(res && typeof res.value === 'boolean') showAllLabels = res.value;
+  }catch(e){}
+  applyLabelMode();
+}
+
+function saveLabelMode(){
+  try{ window.storage.set(LABEL_MODE_KEY, showAllLabels); }
+  catch(e){ console.warn('save label mode failed', e); }
+}
+
+function applyLabelMode(){
+  const btn = document.getElementById('btn-toggle-labels');
+  if(!btn) return;
+  const label = btn.querySelector('.toggle-label');
+  btn.classList.toggle('active', showAllLabels);
+  btn.setAttribute('aria-pressed', String(showAllLabels));
+  if(label){ label.textContent = showAllLabels ? 'ラベル: すべて表示' : 'ラベル: 省略'; }
+}
+
+function toggleLabelMode(){
+  showAllLabels = !showAllLabels;
+  applyLabelMode();
+  saveLabelMode();
+  render();
+  renderPanel();
 }
 
 function computeAutoPositions(){
@@ -150,9 +287,10 @@ function computeAutoPositions(){
 function autoLayoutPositions(forceAll){
   const auto = computeAutoPositions();
   data.nodes.forEach(n=>{
-    if(forceAll || n.x === undefined || n.y === undefined || n.x === null || n.y === null){
+    const current = getNodePosition(n.id);
+    if(forceAll || !current || current.x === undefined || current.y === undefined || current.x === null || current.y === null){
       const p = auto[n.id];
-      if(p){ n.x = p.x; n.y = p.y; }
+      if(p){ setNodePosition(n.id, p.x, p.y); }
     }
   });
 }
@@ -161,7 +299,15 @@ function escapeHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function setPanelContent(html){
+  panelContent.innerHTML = `<br/><br/>${html}`;
+}
+
 let selectedEdge = null;
+let selectedEdgeIds = [];
+let edgeMoveTargetSelectMode = false;
+let edgeMoveTargetSelectSide = null;
+let edgeMoveTargetValue = '';
 let draggingNodeId = null;
 let dragNodeIds = [];
 let dragStartLocal = {x:0, y:0};
@@ -193,6 +339,22 @@ function render(){
 
   const byId = {};
   data.nodes.forEach(n=> byId[n.id]=n);
+
+  function wrapLabel(text){
+    const source = String(text || '');
+    if(!source) return [''];
+    const lines = [];
+    let current = '';
+    Array.from(source).forEach((char)=>{
+      if(current.length && current.length % 15 === 0){
+        lines.push(current);
+        current = '';
+      }
+      current += char;
+    });
+    if(current) lines.push(current);
+    return lines.length ? lines : [source];
+  }
 
   let litSet = null;
   if(selectedIds && selectedIds.length){
@@ -240,16 +402,18 @@ function render(){
       const isOr = (n.requires.length > 1);
       group.forEach(depId=>{
         const dep = byId[depId];
-        if(!dep || dep.x===undefined) return;
-        const dx = n.x - dep.x, dy = n.y - dep.y;
+        const fromPos = getNodePosition(n.id);
+        const depPos = getNodePosition(depId);
+        if(!dep || !fromPos || !depPos) return;
+        const dx = fromPos.x - depPos.x, dy = fromPos.y - depPos.y;
         const dist = Math.max(1, Math.hypot(dx, dy));
         const ux = dx/dist, uy = dy/dist;
-        const x1 = dep.x + ux*(NODE_RADIUS + 2), y1 = dep.y + uy*(NODE_RADIUS + 2);
-        const x2 = n.x - ux*(NODE_RADIUS + ARROW_OFFSET), y2 = n.y - uy*(NODE_RADIUS + ARROW_OFFSET);
+        const x1 = depPos.x + ux*(NODE_RADIUS + 2), y1 = depPos.y + uy*(NODE_RADIUS + 2);
+        const x2 = fromPos.x - ux*(NODE_RADIUS + ARROW_OFFSET), y2 = fromPos.y - uy*(NODE_RADIUS + ARROW_OFFSET);
         const mx = (x1+x2)/2, my = (y1+y2)/2;
         const d = `M ${x1} ${y1} Q ${mx} ${my}, ${x2} ${y2}`;
 
-        const isSelected = selectedEdge && selectedEdge.fromId===n.id && selectedEdge.groupIndex===gi && selectedEdge.depId===depId;
+        const isSelected = Boolean((selectedEdge && selectedEdge.fromId===n.id && selectedEdge.groupIndex===gi && selectedEdge.depId===depId) || selectedEdgeIds.some(item=> item.fromId===n.id && item.groupIndex===gi && item.depId===depId));
 
         const visible = document.createElementNS('http://www.w3.org/2000/svg','path');
         visible.setAttribute('d', d);
@@ -270,7 +434,7 @@ function render(){
         hit.setAttribute('class', 'edge-hit');
         hit.addEventListener('mousedown', (e)=>{ e.stopPropagation(); });
         hit.addEventListener('mouseup', (e)=>{ e.stopPropagation(); });
-        hit.addEventListener('click', (e)=>{ e.stopPropagation(); selectEdge(n.id, gi, depId); });
+        hit.addEventListener('click', (e)=>{ e.stopPropagation(); selectEdge(n.id, gi, depId, e); });
         edgeLayer.appendChild(hit);
       });
     });
@@ -279,7 +443,8 @@ function render(){
 
   const nodeLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
   data.nodes.forEach(n=>{
-    if(n.x===undefined || n.y===undefined) return;
+    const pos = getNodePosition(n.id);
+    if(!pos) return;
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
     let cls = 'node';
     if(selectedIds && selectedIds.includes(n.id)) cls += ' selected';
@@ -292,13 +457,13 @@ function render(){
     if(n.isGoal){
       const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
       ring.setAttribute('class','goal-ring');
-      ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', NODE_RADIUS+7);
+      ring.setAttribute('cx', pos.x); ring.setAttribute('cy', pos.y); ring.setAttribute('r', NODE_RADIUS+7);
       g.appendChild(ring);
     }
 
     const halo = document.createElementNS('http://www.w3.org/2000/svg','circle');
     halo.setAttribute('class','halo');
-    halo.setAttribute('cx', n.x); halo.setAttribute('cy', n.y); halo.setAttribute('r', NODE_RADIUS+5);
+    halo.setAttribute('cx', pos.x); halo.setAttribute('cy', pos.y); halo.setAttribute('r', NODE_RADIUS+5);
     halo.setAttribute('fill','none');
     halo.setAttribute('stroke','var(--text)');
     halo.setAttribute('stroke-width','1');
@@ -306,7 +471,7 @@ function render(){
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
     circle.setAttribute('class','node-circle');
-    circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', NODE_RADIUS);
+    circle.setAttribute('cx', pos.x); circle.setAttribute('cy', pos.y); circle.setAttribute('r', NODE_RADIUS);
     if(n.status === 'avoid' || n.status === 'problem'){
       circle.setAttribute('stroke', '#111111');
       circle.setAttribute('fill', '#111111');
@@ -321,14 +486,14 @@ function render(){
     if(n.status === 'problem'){
       const cross1 = document.createElementNS('http://www.w3.org/2000/svg','line');
       cross1.setAttribute('class','node-cross');
-      cross1.setAttribute('x1', n.x - 10); cross1.setAttribute('y1', n.y - 10);
-      cross1.setAttribute('x2', n.x + 10); cross1.setAttribute('y2', n.y + 10);
+      cross1.setAttribute('x1', pos.x - 10); cross1.setAttribute('y1', pos.y - 10);
+      cross1.setAttribute('x2', pos.x + 10); cross1.setAttribute('y2', pos.y + 10);
       g.appendChild(cross1);
 
       const cross2 = document.createElementNS('http://www.w3.org/2000/svg','line');
       cross2.setAttribute('class','node-cross');
-      cross2.setAttribute('x1', n.x - 10); cross2.setAttribute('y1', n.y + 10);
-      cross2.setAttribute('x2', n.x + 10); cross2.setAttribute('y2', n.y - 10);
+      cross2.setAttribute('x1', pos.x - 10); cross2.setAttribute('y1', pos.y + 10);
+      cross2.setAttribute('x2', pos.x + 10); cross2.setAttribute('y2', pos.y - 10);
       g.appendChild(cross2);
     }
 
@@ -336,24 +501,33 @@ function render(){
     title.textContent = `${n.label}(${STATUS_LABEL[n.status]||n.status})`;
     g.appendChild(title);
 
-    const showLabel = (n.status === 'avoid' || n.status === 'problem')
-      ? ((selectedIds && selectedIds.includes(n.id)) || (litSet && litSet.has(n.id)))
-      : (n.isGoal || n.status === 'wip' || (litSet && litSet.has(n.id)));
+    const showLabel = showAllLabels
+      ? true
+      : ((n.status === 'avoid' || n.status === 'problem')
+        ? ((selectedIds && selectedIds.includes(n.id)) || (litSet && litSet.has(n.id)))
+        : (n.isGoal || n.status === 'wip' || (litSet && litSet.has(n.id))));
     if(showLabel){
       const labelGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
       labelGroup.setAttribute('class','node-label-group');
-      labelGroup.setAttribute('data-anchor-x', n.x);
-      labelGroup.setAttribute('data-anchor-y', n.y);
+      labelGroup.setAttribute('data-anchor-x', pos.x);
+      labelGroup.setAttribute('data-anchor-y', pos.y);
 
       const label = document.createElementNS('http://www.w3.org/2000/svg','text');
       label.setAttribute('class','node-label');
-      label.setAttribute('x', n.x); label.setAttribute('y', n.y + NODE_RADIUS + 20);
-      label.textContent = n.label;
+      label.setAttribute('x', pos.x); label.setAttribute('y', pos.y + NODE_RADIUS + 20);
+      const lines = wrapLabel(n.label);
+      lines.forEach((line, idx)=>{
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+        tspan.setAttribute('x', pos.x);
+        tspan.setAttribute('dy', idx === 0 ? 0 : 1.15 + 'em');
+        tspan.textContent = line;
+        label.appendChild(tspan);
+      });
       labelGroup.appendChild(label);
 
       const sub = document.createElementNS('http://www.w3.org/2000/svg','text');
       sub.setAttribute('class','node-sub');
-      sub.setAttribute('x', n.x); sub.setAttribute('y', n.y + NODE_RADIUS + 33);
+      sub.setAttribute('x', pos.x); sub.setAttribute('y', pos.y + NODE_RADIUS + 33);
       sub.textContent = STATUS_LABEL[n.status] || n.status;
       labelGroup.appendChild(sub);
       g.appendChild(labelGroup);
@@ -362,8 +536,8 @@ function render(){
     g.addEventListener('mousedown', (e)=>{
       e.stopPropagation();
       if(e.shiftKey){
-        connecting = { fromId: n.id, x: n.x, y: n.y };
-        connectMouse = { x: n.x, y: n.y };
+        connecting = { fromId: n.id, x: pos.x, y: pos.y };
+        connectMouse = { x: pos.x, y: pos.y };
       } else {
         draggingNodeId = n.id;
         dragStartLocal = screenToLocal(e.clientX, e.clientY);
@@ -373,7 +547,8 @@ function render(){
         dragOriginPositions = {};
         dragNodeIds.forEach(id=>{
           const node = data.nodes.find(x=>x.id===id);
-          if(node) dragOriginPositions[id] = { x: node.x, y: node.y };
+          const pos = getNodePosition(id);
+          if(node && pos) dragOriginPositions[id] = { x: pos.x, y: pos.y };
         });
       }
     });
@@ -407,7 +582,11 @@ function updateTransform(){
 }
 
 function selectNode(id, e){
-  selectedEdge = null;
+  const wasEdgeSelectionMode = edgeMoveTargetSelectMode;
+  if(!wasEdgeSelectionMode){
+    selectedEdge = null;
+    selectedEdgeIds = [];
+  }
   if(e && e.shiftKey){
     if(!selectedIds) selectedIds = [];
     const idx = selectedIds.indexOf(id);
@@ -417,13 +596,30 @@ function selectNode(id, e){
     selectedIds = [id];
   }
   selectedId = selectedIds[0] || null;
+  if(wasEdgeSelectionMode){
+    edgeMoveTargetValue = id;
+    edgeMoveTargetSelectMode = false;
+    edgeMoveTargetSelectSide = null;
+  }
   render();
   renderPanel();
 }
 
-function selectEdge(fromId, groupIndex, depId){
+function selectEdge(fromId, groupIndex, depId, e){
   selectedIds = []; selectedId = null;
-  selectedEdge = { fromId, groupIndex, depId };
+  const edge = { fromId, groupIndex, depId };
+  if(e && e.shiftKey){
+    const exists = selectedEdgeIds.some(item=> item.fromId===edge.fromId && item.groupIndex===edge.groupIndex && item.depId===edge.depId);
+    if(exists){
+      selectedEdgeIds = selectedEdgeIds.filter(item=> !(item.fromId===edge.fromId && item.groupIndex===edge.groupIndex && item.depId===edge.depId));
+    } else {
+      selectedEdgeIds.push(edge);
+    }
+    selectedEdge = null;
+  } else {
+    selectedEdgeIds = [edge];
+    selectedEdge = edge;
+  }
   render();
   renderPanel();
 }
@@ -461,13 +657,137 @@ function addRequirement(fromId, toId){
 }
 
 function createNodeAt(x, y){
-  const id = 'node_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
-  const newNode = { id, label:'新規ノード', status:'locked', requires:[], x, y };
+  const id = generateNodeId(data.nodes.map(n=>n.id));
+  const newNode = { id, label:'新規ノード', status:'locked', requires:[] };
   data.nodes.push(newNode);
+  setNodePosition(id, x, y);
   selectedEdge = null;
+  selectedEdgeIds = [];
   selectedIds = [id]; selectedId = id;
   saveData();
   render(); renderPanel();
+}
+
+function showMergeNodeDialog(sourceId, targetId){
+  const sourceNode = data.nodes.find(x=>x.id===sourceId);
+  const targetNode = data.nodes.find(x=>x.id===targetId);
+  if(!sourceNode || !targetNode || sourceId === targetId) return;
+
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.inset = '0';
+  overlay.style.background = 'rgba(0,0,0,0.5)';
+  overlay.style.display = 'flex';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.style.zIndex = '1000';
+
+  const dialog = document.createElement('div');
+  dialog.style.width = '420px';
+  dialog.style.maxWidth = '90vw';
+  dialog.style.background = '#2A2521';
+  dialog.style.border = '1px solid #3A332C';
+  dialog.style.borderRadius = '10px';
+  dialog.style.padding = '16px';
+  dialog.style.color = '#EDE6DB';
+
+  dialog.innerHTML = `
+    <div style="font-size:14px; font-weight:600; margin-bottom:8px;">ノードを結合しますか？</div>
+    <div style="font-size:12px; line-height:1.6; color:var(--text-dim); margin-bottom:10px;">「${escapeHtml(sourceNode.label)}」のエッジを「${escapeHtml(targetNode.label)}」へ引き継ぎ、元のノードは削除します。</div>
+    <div class="field-label">新しいラベル</div>
+    <input id="merge-label-input" type="text" value="${escapeHtml(targetNode.label)}" style="width:100%; background:#1B1713; color:#EDE6DB; border:1px solid #3A332C; border-radius:6px; padding:8px 10px; font-size:13px;">
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+      <button class="btn" id="merge-cancel-btn">キャンセル</button>
+      <button class="btn" id="merge-confirm-btn" style="color:var(--goal-ring); border-color:var(--goal-ring);">結合する</button>
+    </div>
+  `;
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#merge-cancel-btn').addEventListener('click', ()=> overlay.remove());
+  overlay.querySelector('#merge-confirm-btn').addEventListener('click', ()=>{
+    const nextLabel = overlay.querySelector('#merge-label-input').value.trim();
+    mergeNodes(sourceId, targetId, nextLabel || targetNode.label);
+    overlay.remove();
+  });
+}
+
+function mergeNodes(sourceId, targetId, newLabel){
+  const sourceNode = data.nodes.find(x=>x.id===sourceId);
+  const targetNode = data.nodes.find(x=>x.id===targetId);
+  if(!sourceNode || !targetNode || sourceId === targetId) return;
+
+  if(newLabel && String(newLabel).trim()) targetNode.label = String(newLabel).trim();
+
+  const sourceRequires = Array.isArray(sourceNode.requires) ? sourceNode.requires : [];
+  if(sourceRequires.length){
+    targetNode.requires = targetNode.requires || [];
+    targetNode.requires.push(...sourceRequires.map(group => group.slice()));
+  }
+
+  data.nodes.forEach(node=>{
+    if(node.id === sourceId || node.id === targetId) return;
+    node.requires = (node.requires || []).map(group => group.map(depId => depId === sourceId ? targetId : depId));
+    node.requires = node.requires.filter(group => group.length > 0);
+  });
+
+  data.nodes = data.nodes.filter(node => node.id !== sourceId);
+  delete data.node_positions[sourceId];
+
+  selectedIds = selectedIds.filter(id => id !== sourceId);
+  selectedIds = selectedIds.includes(targetId) ? selectedIds : [...selectedIds, targetId];
+  selectedId = targetId;
+  selectedEdge = null;
+  selectedEdgeIds = [];
+  saveData();
+  render();
+  renderPanel();
+}
+
+function resolveNodeReference(value){
+  const trimmed = String(value || '').trim();
+  if(!trimmed) return null;
+  const direct = data.nodes.find(node => node.id === trimmed);
+  if(direct) return direct;
+  const byLabel = data.nodes.find(node => node.label === trimmed);
+  if(byLabel) return byLabel;
+  const contains = data.nodes.find(node => node.label.includes(trimmed));
+  return contains || null;
+}
+
+function moveSelectedEdges(side, targetNodeId){
+  const targetNode = data.nodes.find(node => node.id === targetNodeId);
+  if(!targetNode) return;
+
+  selectedEdgeIds.forEach(edge=>{
+    const sourceNode = data.nodes.find(node => node.id === edge.fromId);
+    if(!sourceNode) return;
+    if(!sourceNode.requires || !sourceNode.requires[edge.groupIndex]) return;
+
+    if(side === 'dep'){
+      sourceNode.requires[edge.groupIndex] = sourceNode.requires[edge.groupIndex]
+        .map(depId => depId === edge.depId ? targetNodeId : depId)
+        .filter(Boolean);
+      sourceNode.requires = sourceNode.requires.filter(group => group.length > 0);
+      return;
+    }
+
+    const depId = edge.depId;
+    const exists = targetNode.requires && targetNode.requires.some(group => group.includes(depId));
+    if(!exists){
+      targetNode.requires = targetNode.requires || [];
+      targetNode.requires.push([depId]);
+    }
+    sourceNode.requires[edge.groupIndex] = sourceNode.requires[edge.groupIndex].filter(depIdValue => depIdValue !== depId);
+    sourceNode.requires = sourceNode.requires.filter(group => group.length > 0);
+  });
+
+  selectedEdge = null;
+  selectedEdgeIds = [];
+  saveData();
+  render();
+  renderPanel();
 }
 
 // 状態ボタン生成
@@ -510,9 +830,94 @@ function buildUnlocksHtml(node){
 
 // 関係パネル描画
 function renderEdgePanel(){
-  const from = data.nodes.find(x=>x.id===selectedEdge.fromId);
-  const dep = data.nodes.find(x=>x.id===selectedEdge.depId);
-  panelContent.innerHTML = `
+  if(selectedEdgeIds.length > 1){
+    const reqs = [...new Set(selectedEdgeIds.map(e=>e.depId).filter(Boolean))];
+    const targets = [...new Set(selectedEdgeIds.map(e=>e.fromId).filter(Boolean))];
+    const showAmbiguityError = reqs.length > 1 && targets.length > 1;
+    const moveSide = reqs.length === 1 ? 'dep' : (targets.length === 1 ? 'from' : null);
+    const moveTargetNode = moveSide === 'dep' ? data.nodes.find(node => node.id === reqs[0]) : data.nodes.find(node => node.id === targets[0]);
+    const moveLabel = moveSide === 'dep' ? '前提を移動' : '向き先を移動';
+    setPanelContent(`
+      <div><h2>関係（複数選択）</h2></div>
+      ${showAmbiguityError ? '<div style="margin-top:6px; color:var(--danger); font-size:12px; line-height:1.6;">前提・向き先がどちらも1つにまとまっていません。</div>' : ''}
+      <div style="margin-top:8px;">
+        <div class="field-label">前提</div>
+        <div class="req-list">${reqs.map(id=>{
+          const node = data.nodes.find(x=>x.id===id);
+          return `<div class="req-item"><span class="dot" style="border-color:var(${STATUS_COLOR_VAR[node?.status || 'locked']})"></span>${escapeHtml(node?.label || id)}</div>`;
+        }).join('')}</div>
+      </div>
+      <div style="margin-top:8px;">
+        <div class="field-label">向き先</div>
+        <div class="unlocks-list">${targets.map(id=>{
+          const node = data.nodes.find(x=>x.id===id);
+          return `<div>→ ${escapeHtml(node?.label || id)}</div>`;
+        }).join('')}</div>
+      </div>
+      ${moveSide ? `<div style="margin-top:10px;">
+        <div class="field-label">${moveLabel}</div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="edge-move-input" value="${escapeHtml(edgeMoveTargetValue)}" placeholder="ノードID / ラベル" style="flex:0 0 50%; width:50%; background:#1B1713; color:#EDE6DB; border:1px solid #3A332C; border-radius:6px; padding:8px 10px; font-size:13px;">
+          <button class="btn" id="edge-move-btn" style="flex:0 0 auto; color:${edgeMoveTargetSelectMode && edgeMoveTargetSelectSide === moveSide ? 'var(--text)' : 'var(--goal-ring)'}; border-color:${edgeMoveTargetSelectMode && edgeMoveTargetSelectSide === moveSide ? 'var(--text)' : 'var(--goal-ring)'};">移動先選択</button>
+        </div>
+        <div style="margin-top:6px; font-size:11px; color:var(--text-faint);">ノードを選択すると ID が入ります。</div>
+      </div>` : ''}
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" id="edge-move-exec-btn" style="color:var(--goal-ring); border-color:var(--goal-ring);">移動</button>
+        <button class="btn" id="delete-edge-btn" style="color:var(--danger); border-color:var(--danger);">選択した関係を削除</button>
+      </div>
+    `);
+    document.getElementById('delete-edge-btn').addEventListener('click', ()=>{
+      selectedEdgeIds.forEach(edge=> deleteEdge(edge.fromId, edge.groupIndex, edge.depId));
+      selectedEdgeIds = [];
+      selectedEdge = null;
+      render(); renderPanel();
+    });
+    const moveExecBtn = document.getElementById('edge-move-exec-btn');
+    if(moveExecBtn){
+      moveExecBtn.addEventListener('click', ()=>{
+        const input = document.getElementById('edge-move-input');
+        const targetNode = resolveNodeReference(input ? input.value : '');
+        if(!targetNode){ alert('移動先のノードが見つかりません'); return; }
+        if(moveSide === 'dep' && targetNode.id === moveTargetNode?.id){
+          alert('同じノードには移動できません'); return;
+        }
+        if(moveSide === 'from' && targetNode.id === moveTargetNode?.id){
+          alert('同じノードには移動できません'); return;
+        }
+        moveSelectedEdges(moveSide, targetNode.id);
+      });
+    }
+    const moveBtn = document.getElementById('edge-move-btn');
+    if(moveBtn){
+      moveBtn.addEventListener('click', ()=>{
+        if(edgeMoveTargetSelectMode && edgeMoveTargetSelectSide === moveSide){
+          edgeMoveTargetSelectMode = false;
+          edgeMoveTargetSelectSide = null;
+          render();
+          renderPanel();
+          return;
+        }
+        edgeMoveTargetSelectMode = true;
+        edgeMoveTargetSelectSide = moveSide;
+        render();
+        renderPanel();
+      });
+    }
+    const moveInput = document.getElementById('edge-move-input');
+    if(moveInput){
+      moveInput.addEventListener('change', ()=>{
+        edgeMoveTargetValue = moveInput.value;
+      });
+    }
+    return;
+  }
+
+  const edge = selectedEdge || selectedEdgeIds[0];
+  if(!edge){ renderEmptyPanel(); return; }
+  const from = data.nodes.find(x=>x.id===edge.fromId);
+  const dep = data.nodes.find(x=>x.id===edge.depId);
+  setPanelContent(`
     <div><h2>関係</h2></div>
     <div class="req-group">
       <div style="font-size:13px;">${from ? escapeHtml(from.label) : '?'}</div>
@@ -520,12 +925,26 @@ function renderEdgePanel(){
       <div style="font-size:13px;">${dep ? escapeHtml(dep.label) : '?'}</div>
     </div>
     <button class="btn" id="delete-edge-btn" style="color:var(--danger); border-color:var(--danger);">この関係を削除</button>
-  `;
+  `);
   document.getElementById('delete-edge-btn').addEventListener('click', ()=>{
-    deleteEdge(selectedEdge.fromId, selectedEdge.groupIndex, selectedEdge.depId);
+    deleteEdge(edge.fromId, edge.groupIndex, edge.depId);
     selectedEdge = null;
+    selectedEdgeIds = [];
     render(); renderPanel();
   });
+}
+
+function buildBulkStatusButtons(selectedNodeIds){
+  const selectedNodes = selectedNodeIds.map(id=>data.nodes.find(x=>x.id===id)).filter(Boolean);
+  const commonStatus = selectedNodes.length && selectedNodes.every(n=>n.status===selectedNodes[0].status)
+    ? selectedNodes[0].status
+    : null;
+  return STATUS_ORDER.map(s=>{
+    const active = commonStatus && s===commonStatus ? 'active' : '';
+    return `<button class="status-btn ${active}" data-status="${s}">
+      <span class="dot" style="border-color:var(${STATUS_COLOR_VAR[s]})"></span>${STATUS_LABEL[s]}
+    </button>`;
+  }).join('');
 }
 
 // 複数選択パネル描画
@@ -537,11 +956,62 @@ function renderMultiSelectPanel(){
       <div style="font-family:var(--mono); font-size:11px; color:var(--text-faint);">${id}</div>
     </div>`;
   }).join('');
-  panelContent.innerHTML = `
+  setPanelContent(`
     <div><h2>選択中: ${selectedIds.length} 件</h2></div>
     <div style="max-height:240px; overflow:auto; margin-top:8px;">${list}</div>
-    <div style="margin-top:10px;"><button class="btn" id="delete-multi-btn" style="color:var(--danger); border-color:var(--danger);">選択したノードを削除</button></div>
-  `;
+    <div style="margin-top:14px;">
+      <div class="field-label">ステータスを一括変更</div>
+      <div class="status-grid">${buildBulkStatusButtons(selectedIds)}</div>
+    </div>
+    <div style="margin-top:14px;">
+      <div class="field-label">ゴール指定を一括変更</div>
+      <button class="goal-toggle" id="bulk-goal-toggle" type="button">
+        ${selectedIds.some(id=>{
+          const node = data.nodes.find(x=>x.id===id);
+          return node && node.isGoal;
+        }) ? '★ 選択中のノードをゴールに指定' : '☆ 選択中のノードをゴールに指定'}
+      </button>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn" id="merge-multi-btn" style="color:var(--goal-ring); border-color:var(--goal-ring);">選択を結合</button>
+      <button class="btn" id="delete-multi-btn" style="color:var(--danger); border-color:var(--danger);">選択したノードを削除</button>
+    </div>
+  `);
+  panelContent.querySelectorAll('.status-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const status = btn.getAttribute('data-status');
+      selectedIds.forEach(id=>{
+        const node = data.nodes.find(x=>x.id===id);
+        if(node) node.status = status;
+      });
+      saveData();
+      render(); renderPanel();
+    });
+  });
+  const bulkGoalToggle = document.getElementById('bulk-goal-toggle');
+  if(bulkGoalToggle){
+    bulkGoalToggle.addEventListener('click', ()=>{
+      const nextValue = !selectedIds.some(id=>{
+        const node = data.nodes.find(x=>x.id===id);
+        return node && node.isGoal;
+      });
+      selectedIds.forEach(id=>{
+        const node = data.nodes.find(x=>x.id===id);
+        if(node) node.isGoal = nextValue;
+      });
+      saveData();
+      render(); renderPanel();
+    });
+  }
+  const mergeMultiBtn = document.getElementById('merge-multi-btn');
+  if(mergeMultiBtn){
+    mergeMultiBtn.addEventListener('click', ()=>{
+      if(selectedIds.length < 2){ return; }
+      const primaryId = selectedIds[0];
+      const targetId = selectedIds[1];
+      showMergeNodeDialog(primaryId, targetId);
+    });
+  }
   document.getElementById('delete-multi-btn').addEventListener('click', ()=>{
     if(!confirm(`選択中の ${selectedIds.length} 件を削除しますか?`)) return;
     const toDelete = selectedIds.slice();
@@ -554,7 +1024,7 @@ function renderMultiSelectPanel(){
 
 // 空状態パネル描画
 function renderEmptyPanel(){
-  panelContent.innerHTML = `<div class="empty">
+  setPanelContent(`<div class="empty">
     <br />
     <br />
     ノードをクリックすると詳細が表示されます。<br><br>
@@ -563,7 +1033,7 @@ function renderEmptyPanel(){
     ・Shift+ドラッグ → 別ノードへ関係作成<br>
     ・選択してDelete → 削除<br>
     ・Escape → 選択解除
-  </div>`;
+  </div>`);
 }
 
 // ノード詳細パネルイベントバインド
@@ -602,7 +1072,7 @@ function bindNodePanelEvents(node){
 
 // ノード詳細パネル描画
 function renderNodePanel(node){
-  panelContent.innerHTML = `
+  setPanelContent(`
     <div>
       <br />
       <br />
@@ -628,13 +1098,13 @@ function renderNodePanel(node){
       <div class="unlocks-list">${buildUnlocksHtml(node)}</div>
     </div>
     <button class="btn" id="delete-node-btn" style="color:var(--danger); border-color:var(--danger);">このノードを削除</button>
-  `;
+  `);
   bindNodePanelEvents(node);
 }
 
 // パネル描画入口
 function renderPanel(){
-  if(selectedEdge){
+  if(selectedEdge || selectedEdgeIds.length){
     renderEdgePanel();
     return;
   }
@@ -648,7 +1118,7 @@ function renderPanel(){
   }
   const node = data.nodes.find(x=>x.id=== (selectedIds[0] || selectedId));
   if(!node){
-    panelContent.innerHTML = '';
+    setPanelContent('');
     return;
   }
   renderNodePanel(node);
@@ -710,9 +1180,8 @@ window.addEventListener('mousemove', (e)=>{
     dragNodeIds.forEach(id=>{
       const node = data.nodes.find(x=>x.id===id);
       if(node){
-        const origin = dragOriginPositions[id] || { x: node.x, y: node.y };
-        node.x = origin.x + dx;
-        node.y = origin.y + dy;
+        const origin = dragOriginPositions[id] || { x: getNodePosition(id).x, y: getNodePosition(id).y };
+        setNodePosition(id, origin.x + dx, origin.y + dy);
       }
     });
     scheduleRender();
@@ -730,8 +1199,9 @@ window.addEventListener('mouseup', (e)=>{
     const minx = Math.min(a.x,b.x), maxx = Math.max(a.x,b.x);
     const miny = Math.min(a.y,b.y), maxy = Math.max(a.y,b.y);
     data.nodes.forEach(n=>{
-      if(n.x===undefined || n.y===undefined) return;
-      if(n.x >= minx && n.x <= maxx && n.y >= miny && n.y <= maxy){
+      const pos = getNodePosition(n.id);
+      if(!pos || pos.x===undefined || pos.y===undefined) return;
+      if(pos.x >= minx && pos.x <= maxx && pos.y >= miny && pos.y <= maxy){
         if(!selectedIds.includes(n.id)) selectedIds.push(n.id);
       }
     });
@@ -746,7 +1216,8 @@ window.addEventListener('mouseup', (e)=>{
     graphWrap.classList.remove('dragging');
     if(clickCandidate){
       const p = screenToLocal(clickCandidate.x, clickCandidate.y);
-      createNodeAt(p.x, p.y);
+      const shouldCreate = e.metaKey || e.ctrlKey;
+      if(shouldCreate) createNodeAt(p.x, p.y);
     }
     clickCandidate = null;
   }
@@ -761,7 +1232,7 @@ window.addEventListener('mouseup', (e)=>{
     const nodeEl = target && target.closest && target.closest('.node');
     if(nodeEl){
       const targetId = nodeEl.getAttribute('data-id');
-      if(targetId) addRequirement(connecting.fromId, targetId);
+      if(targetId) addRequirement(targetId, connecting.fromId);
     }
     connecting = null;
     scheduleRender();
@@ -771,16 +1242,27 @@ window.addEventListener('mouseup', (e)=>{
 graphWrap.addEventListener('wheel', (e)=>{
   e.preventDefault();
   const delta = e.deltaY > 0 ? -0.08 : 0.08;
-  zoom = Math.min(2.2, Math.max(0.35, zoom + delta));
+  const before = screenToLocal(e.clientX, e.clientY);
+  const nextZoom = Math.min(2.2, Math.max(0.35, zoom + delta));
+  pan.x += (zoom - nextZoom) * before.x;
+  pan.y += (zoom - nextZoom) * before.y;
+  zoom = nextZoom;
   updateTransform();
 }, { passive:false });
 
 graphWrap.addEventListener('click', (e)=>{
   if(e.target.closest && e.target.closest('.node')) return;
   if(e.shiftKey) return;
+  if(e.metaKey || e.ctrlKey) return;
+  if(edgeMoveTargetSelectMode){
+    render();
+    renderPanel();
+    return;
+  }
   selectedIds = [];
   selectedId = null;
   selectedEdge = null;
+  selectedEdgeIds = [];
   render(); renderPanel();
 });
 
@@ -788,7 +1270,13 @@ document.addEventListener('keydown', (e)=>{
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA') return;
   if(e.key === 'Escape'){
-    selectedIds = []; selectedId = null; selectedEdge = null; connecting = null;
+    if(edgeMoveTargetSelectMode){
+      edgeMoveTargetSelectMode = false;
+      edgeMoveTargetSelectSide = null;
+      render(); renderPanel();
+      return;
+    }
+    selectedIds = []; selectedId = null; selectedEdge = null; selectedEdgeIds = []; connecting = null;
     render(); renderPanel();
   } else if(e.key === 'Delete' || e.key === 'Backspace'){
     if(selectedIds && selectedIds.length){
@@ -798,10 +1286,12 @@ document.addEventListener('keydown', (e)=>{
       toDelete.forEach(id=> deleteNode(id));
       selectedIds = []; selectedId = null;
       render(); renderPanel();
-    } else if(selectedEdge){
+    } else if(selectedEdge || selectedEdgeIds.length){
       e.preventDefault();
-      deleteEdge(selectedEdge.fromId, selectedEdge.groupIndex, selectedEdge.depId);
+      const edges = selectedEdgeIds.length ? selectedEdgeIds : [selectedEdge];
+      edges.filter(Boolean).forEach(edge=> deleteEdge(edge.fromId, edge.groupIndex, edge.depId));
       selectedEdge = null;
+      selectedEdgeIds = [];
       render(); renderPanel();
     }
   }
@@ -809,26 +1299,29 @@ document.addEventListener('keydown', (e)=>{
 
 document.getElementById('btn-reset').addEventListener('click', async ()=>{
   if(!confirm('例のデータにリセットします。よろしいですか?')) return;
-  data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  data = migrateDataShape(JSON.parse(JSON.stringify(DEFAULT_DATA)));
   autoLayoutPositions(false);
-  selectedIds = []; selectedId = null; selectedEdge = null;
+  selectedIds = []; selectedId = null; selectedEdge = null; selectedEdgeIds = [];
   saveData();
   render(); renderPanel();
 });
 
-document.getElementById('btn-recompute').addEventListener('click', ()=>{
-  autoLayoutPositions(true);
-  saveData();
-  render(); renderPanel();
-});
+// 配置を再計算　の処理はいけてないので、非活性化
+// document.getElementById('btn-recompute').addEventListener('click', ()=>{
+//   autoLayoutPositions(true);
+//   saveData();
+//   render(); renderPanel();
+// });
 
 document.getElementById('btn-export').addEventListener('click', ()=>{
+  saveExportName();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const ts = new Date().toISOString().slice(0,10);
+  const baseName = normalizeExportName(exportName);
   a.href = url;
-  a.download = `goal-network-${ts}.json`;
+  a.download = `${baseName}-${ts}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -837,6 +1330,12 @@ document.getElementById('btn-export').addEventListener('click', ()=>{
 
 const fileInput = document.getElementById('file-input');
 document.getElementById('btn-import').addEventListener('click', ()=> fileInput.click());
+if(exportNameInput){
+  exportNameInput.addEventListener('input', ()=>{
+    saveExportName();
+  });
+}
+
 fileInput.addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -845,9 +1344,12 @@ fileInput.addEventListener('change', (e)=>{
     try{
       const parsed = JSON.parse(reader.result);
       if(!parsed.nodes || !Array.isArray(parsed.nodes)) throw new Error('nodes 配列が必要です');
-      data = parsed;
+      data = migrateDataShape(parsed);
       autoLayoutPositions(false);
-      selectedIds = []; selectedId = null; selectedEdge = null;
+      selectedIds = []; selectedId = null; selectedEdge = null; selectedEdgeIds = [];
+      exportName = normalizeExportName(file.name.replace(/\.json$/i, ''));
+      if(exportNameInput){ exportNameInput.value = exportName; }
+      saveExportName();
       saveData();
       render(); renderPanel();
     }catch(err){
@@ -858,10 +1360,12 @@ fileInput.addEventListener('change', (e)=>{
   fileInput.value = '';
 });
 
+document.getElementById('btn-toggle-labels').addEventListener('click', toggleLabelMode);
+
 document.getElementById('btn-edit').addEventListener('click', ()=>{
-  selectedIds = []; selectedId = null; selectedEdge = null;
+  selectedIds = []; selectedId = null; selectedEdge = null; selectedEdgeIds = [];
   render();
-  panelContent.innerHTML = `
+  setPanelContent(`
     <div>
       <br />
       <br />
@@ -876,13 +1380,13 @@ document.getElementById('btn-edit').addEventListener('click', ()=>{
       <button class="btn" id="apply-json">適用</button>
       <button class="btn" id="cancel-json">閉じる</button>
     </div>
-  `;
+  `);
   document.getElementById('apply-json').addEventListener('click', ()=>{
     const msg = document.getElementById('json-msg');
     try{
       const parsed = JSON.parse(document.getElementById('json-editor').value);
       if(!parsed.nodes || !Array.isArray(parsed.nodes)) throw new Error('nodes 配列が必要です');
-      data = parsed;
+      data = migrateDataShape(parsed);
       autoLayoutPositions(false);
       saveData();
       render(); renderPanel();
@@ -896,6 +1400,8 @@ document.getElementById('btn-edit').addEventListener('click', ()=>{
 
 (async function init(){
   await loadData();
+  await loadExportName();
+  await loadLabelMode();
   autoLayoutPositions(false);
   render();
   renderPanel();

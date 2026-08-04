@@ -1,69 +1,83 @@
 {
   "nodes": [
     {
-      "id": "ingredients",
+      "id": "a001",
       "label": "材料がある",
       "status": "achieved",
       "requires": []
     },
     {
-      "id": "tools",
+      "id": "a002",
       "label": "調理器具がある",
       "status": "achieved",
       "requires": []
     },
     {
-      "id": "money",
+      "id": "a003",
       "label": "手持ちのお金がある",
       "status": "achieved",
       "requires": []
     },
     {
-      "id": "can_cook_curry",
+      "id": "a004",
       "label": "カレーを作れる",
       "status": "wip",
       "requires": [
         [
-          "ingredients",
-          "tools"
+          "a001",
+          "a002"
         ]
       ]
     },
     {
-      "id": "can_cook_stew",
-      "label": "シチューを作れる",
-      "status": "wip",
-      "requires": [
-        [
-          "ingredients",
-          "tools"
-        ]
-      ]
-    },
-    {
-      "id": "can_go_shop",
+      "id": "a005",
       "label": "カレー屋に行ける",
       "status": "achieved",
       "requires": [
         [
-          "money"
+          "a003"
         ]
-      ],
-      "isGoal": true
+      ]
     },
     {
-      "id": "can_eat",
+      "id": "a006",
       "label": "カレーを食べられる",
       "status": "target",
       "requires": [
         [
-          "can_cook_curry"
+          "a004"
         ],
         [
-          "can_go_shop"
+          "a005"
         ]
       ],
       "isGoal": true
     }
-  ]
+  ],
+  "node_positions": {
+    "a001": {
+      "x": 1014.0631103515625,
+      "y": 1100.127197265625
+    },
+    "a002": {
+      "x": 1187.4420421999744,
+      "y": 1233.4818115234375
+    },
+    "a003": {
+      "x": 1488.9949695187756,
+      "y": 1337.1455078125
+    },
+    "a004": {
+      "x": 1070.0087890625,
+      "y": 996.9363403320312
+    },
+    "a005": {
+      "x": 1443.52783203125,
+      "y": 1177.6357421875
+    },
+    "a006": {
+      "x": 1200,
+      "y": 874
+    }
+  }
 }
