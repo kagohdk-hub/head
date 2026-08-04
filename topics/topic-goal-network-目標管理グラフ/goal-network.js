@@ -1152,6 +1152,10 @@ graphWrap.addEventListener('mousedown', (e)=>{
   clickCandidate = {x:e.clientX, y:e.clientY};
 });
 
+// 一度だけviewboxと表示の割合を計算してキャッシュしておく
+const rect = svg.getBoundingClientRect();
+const scaleFactor = CANVAS_SIZE / rect.width; // viewBox単位 ÷ 表示px
+
 window.addEventListener('mousemove', (e)=>{
   if(rectSelecting){
     const x = Math.min(rectStartClient.x, e.clientX);
@@ -1169,8 +1173,8 @@ window.addEventListener('mousemove', (e)=>{
   if(panActive){
     const dx = e.clientX - panStart.x, dy = e.clientY - panStart.y;
     if(Math.hypot(dx,dy) > 4) clickCandidate = null;
-    pan.x = panOrigin.x + dx;
-    pan.y = panOrigin.y + dy;
+    pan.x = panOrigin.x + dx * scaleFactor;
+    pan.y = panOrigin.y + dy * scaleFactor;
     updateTransform();
   }
   if(draggingNodeId){
