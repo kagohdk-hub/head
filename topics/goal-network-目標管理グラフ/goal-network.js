@@ -6,12 +6,8 @@ const LABEL_MODE_KEY = 'goal-network-label-mode';
 
 const DEFAULT_DATA = {
   nodes: [
-    { id:'a001', label:'材料がある', status:'achieved', requires:[] },
-    { id:'a002', label:'調理器具がある', status:'achieved', requires:[] },
-    { id:'a003', label:'手持ちのお金がある', status:'achieved', requires:[] },
-    { id:'a004', label:'カレーを作れる', status:'wip', requires:[['a001','a002']] },
-    { id:'a005', label:'カレー屋に行ける', status:'achieved', requires:[['a003']] },
-    { id:'a006', label:'カレーを食べられる', status:'target', requires:[['a004'],['a005']], isGoal:true }
+    { id:'a001', label:'スタート', status:'problem', requires:[], shape:'circle' },
+    { id:'a002', label:'ゴール', status:'locked', requires:[['a001']], isGoal: true, shape:'circle' }
   ],
   node_positions: {}
 };
@@ -284,11 +280,11 @@ function computeAutoPositions(){
   return result;
 }
 
-function autoLayoutPositions(forceAll){
+function autoLayoutPositions(){
   const auto = computeAutoPositions();
   data.nodes.forEach(n=>{
     const current = getNodePosition(n.id);
-    if(forceAll || !current || current.x === undefined || current.y === undefined || current.x === null || current.y === null){
+    if(!current || current.x === undefined || current.y === undefined || current.x === null || current.y === null){
       const p = auto[n.id];
       if(p){ setNodePosition(n.id, p.x, p.y); }
     }
@@ -469,19 +465,41 @@ function render(){
     halo.setAttribute('stroke-width','1');
     g.appendChild(halo);
 
-    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circle.setAttribute('class','node-circle');
-    circle.setAttribute('cx', pos.x); circle.setAttribute('cy', pos.y); circle.setAttribute('r', NODE_RADIUS);
-    if(n.status === 'avoid' || n.status === 'problem'){
-      circle.setAttribute('stroke', '#111111');
-      circle.setAttribute('fill', '#111111');
+    const shapeName = (n.shape === 'triangle') ? 'triangle' : 'circle';
+    if(shapeName === 'triangle'){
+      const triangle = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      triangle.setAttribute('class','node-circle');
+      const points = [
+        `${pos.x},${pos.y - NODE_RADIUS}`,
+        `${pos.x + NODE_RADIUS},${pos.y + NODE_RADIUS}`,
+        `${pos.x - NODE_RADIUS},${pos.y + NODE_RADIUS}`
+      ].join(' ');
+      triangle.setAttribute('points', points);
+      if(n.status === 'avoid' || n.status === 'problem'){
+        triangle.setAttribute('stroke', '#111111');
+        triangle.setAttribute('fill', '#111111');
+      } else {
+        const strokeVar = STATUS_COLOR_VAR[n.status] || '--locked';
+        const fillVar = STATUS_FILL_VAR[n.status];
+        triangle.setAttribute('stroke', `var(${strokeVar})`);
+        triangle.setAttribute('fill', fillVar ? `var(${fillVar})` : 'var(--bg)');
+      }
+      g.appendChild(triangle);
     } else {
-      const strokeVar = STATUS_COLOR_VAR[n.status] || '--locked';
-      const fillVar = STATUS_FILL_VAR[n.status];
-      circle.setAttribute('stroke', `var(${strokeVar})`);
-      circle.setAttribute('fill', fillVar ? `var(${fillVar})` : 'var(--bg)');
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('class','node-circle');
+      circle.setAttribute('cx', pos.x); circle.setAttribute('cy', pos.y); circle.setAttribute('r', NODE_RADIUS);
+      if(n.status === 'avoid' || n.status === 'problem'){
+        circle.setAttribute('stroke', '#111111');
+        circle.setAttribute('fill', '#111111');
+      } else {
+        const strokeVar = STATUS_COLOR_VAR[n.status] || '--locked';
+        const fillVar = STATUS_FILL_VAR[n.status];
+        circle.setAttribute('stroke', `var(${strokeVar})`);
+        circle.setAttribute('fill', fillVar ? `var(${fillVar})` : 'var(--bg)');
+      }
+      g.appendChild(circle);
     }
-    g.appendChild(circle);
 
     if(n.status === 'problem'){
       const cross1 = document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -658,7 +676,7 @@ function addRequirement(fromId, toId){
 
 function createNodeAt(x, y){
   const id = generateNodeId(data.nodes.map(n=>n.id));
-  const newNode = { id, label:'新規ノード', status:'locked', requires:[] };
+  const newNode = { id, label:'新規ノード', status:'locked', requires:[], shape:'circle' };
   data.nodes.push(newNode);
   setNodePosition(id, x, y);
   selectedEdge = null;
@@ -666,6 +684,38 @@ function createNodeAt(x, y){
   selectedIds = [id]; selectedId = id;
   saveData();
   render(); renderPanel();
+}
+
+function createNodeFromSelection(reverse = false){
+  const selectedNodeId = selectedIds && selectedIds.length === 1 ? selectedIds[0] : null;
+  if(selectedNodeId){
+    const anchor = getNodePosition(selectedNodeId);
+    if(anchor){
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 140 + Math.random() * 90;
+      const x = anchor.x + Math.cos(angle) * distance;
+      const y = anchor.y + Math.sin(angle) * distance;
+      const id = generateNodeId(data.nodes.map(n=>n.id));
+      const newNode = { id, label:'新規ノード', status:'locked', requires:[], shape:'circle' };
+      data.nodes.push(newNode);
+      setNodePosition(id, x, y);
+      if(reverse){
+        addRequirement(selectedNodeId, id);
+      } else {
+        addRequirement(id, selectedNodeId);
+      }
+      selectedEdge = null;
+      selectedEdgeIds = [];
+      selectedIds = [id]; selectedId = id;
+      saveData();
+      render(); renderPanel();
+      return;
+    }
+  }
+
+  const rect = graphWrap.getBoundingClientRect();
+  const center = screenToLocal(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  createNodeAt(center.x, center.y);
 }
 
 function showMergeNodeDialog(sourceId, targetId){
@@ -1045,6 +1095,14 @@ function bindNodePanelEvents(node){
     render(); renderPanel();
   });
 
+  panelContent.querySelectorAll('.shape-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      node.shape = btn.getAttribute('data-shape') || 'circle';
+      saveData();
+      render(); renderPanel();
+    });
+  });
+
   panelContent.querySelectorAll('.status-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       node.status = btn.getAttribute('data-status');
@@ -1079,6 +1137,13 @@ function renderNodePanel(node){
       <br />
       <input type="text" id="label-input" value="${escapeHtml(node.label)}">
       <div style="font-family:var(--mono); font-size:10px; color:var(--text-faint); margin-top:4px;">${node.id}</div>
+    </div>
+    <div>
+      <div class="field-label">形状</div>
+      <div class="shape-grid" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn shape-btn ${node.shape === 'circle' ? 'active' : ''}" data-shape="circle" type="button">丸</button>
+        <button class="btn shape-btn ${node.shape === 'triangle' ? 'active' : ''}" data-shape="triangle" type="button">三角</button>
+      </div>
     </div>
     <div>
       <div class="field-label">ステータス</div>
@@ -1245,12 +1310,24 @@ window.addEventListener('mouseup', (e)=>{
 
 graphWrap.addEventListener('wheel', (e)=>{
   e.preventDefault();
-  const delta = e.deltaY > 0 ? -0.08 : 0.08;
-  const before = screenToLocal(e.clientX, e.clientY);
-  const nextZoom = Math.min(2.2, Math.max(0.35, zoom + delta));
-  pan.x += (zoom - nextZoom) * before.x;
-  pan.y += (zoom - nextZoom) * before.y;
-  zoom = nextZoom;
+
+  if(e.metaKey || e.ctrlKey){
+    const delta = e.deltaY > 0 ? 0.08 : -0.08;
+    const before = screenToLocal(e.clientX, e.clientY);
+    const nextZoom = Math.min(2.2, Math.max(0.35, zoom + delta));
+    pan.x += (zoom - nextZoom) * before.x;
+    pan.y += (zoom - nextZoom) * before.y;
+    zoom = nextZoom;
+    updateTransform();
+    return;
+  }
+
+  const delta = e.deltaY || e.deltaX || 0;
+  if(e.shiftKey){
+    pan.x -= delta * 0.8;
+  } else {
+    pan.y -= delta * 0.8;
+  }
   updateTransform();
 }, { passive:false });
 
@@ -1273,6 +1350,111 @@ graphWrap.addEventListener('click', (e)=>{
 document.addEventListener('keydown', (e)=>{
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+  const isCommandOrCtrl = e.metaKey || e.ctrlKey;
+  const key = e.key ? e.key.toLowerCase() : '';
+
+  if(isCommandOrCtrl && key === 'n'){
+    e.preventDefault();
+    createNodeFromSelection(Boolean(e.shiftKey));
+    return;
+  }
+
+  if(selectedIds && selectedIds.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+    e.preventDefault();
+
+    // 方向キーは「ノードを移動」させず、選択対象を切り替える。
+    // ルールは次の通り:
+    // - 上: 現在ノードの下流側、つまり currentNode を前提にしているノード (unlocks) を優先して選ぶ。
+    // - 下: 現在ノードの上流側、つまり currentNode の requires の依存先へ戻る。
+    // - 左: 全ノードの中から、現在ノードからの三平方距離が 400 以下のノードだけを候補とし、
+    //       x 座標が小さい順で位置ベースに並べ、ひとつ前の候補へ移動する。
+    //       その候補がなければ、候補群の最も右側へ巻き戻る。
+    // - 右: 全ノードの中から、現在ノードからの三平方距離が 400 以下のノードだけを候補とし、
+    //       x 座標が大きい順で位置ベースに並べ、ひとつ次の候補へ移動する。
+    //       その候補がなければ、候補群の最も左側へ巻き戻る。
+    // - エッジ接続による絞り込みは行わず、全ノードの位置と距離で候補を決める。
+    // - 候補が 1 個だけなら左右キーは何もしない。
+    const currentId = selectedIds[0];
+    const currentNode = data.nodes.find(n => n.id === currentId);
+    if(!currentNode) return;
+
+    const isUp = e.key === 'ArrowUp';
+    const isDown = e.key === 'ArrowDown';
+    const isLeft = e.key === 'ArrowLeft';
+    const isRight = e.key === 'ArrowRight';
+
+    const currentPos = getNodePosition(currentId) || { x: 0, y: 0 };
+    const globalCandidates = data.nodes
+      .filter(other => other.id !== currentId)
+      .map(other => {
+        const pos = getNodePosition(other.id) || { x: 0, y: 0 };
+        const distance = Math.hypot(pos.x - currentPos.x, pos.y - currentPos.y);
+        return { id: other.id, x: pos.x, y: pos.y, distance };
+      })
+      .filter(node => node.distance <= 400)
+      .sort((a, b) => a.x - b.x || a.y - b.y);
+
+    if((isLeft || isRight) && globalCandidates.length > 0){
+      const currentX = currentPos.x;
+      const ordered = isLeft
+        ? globalCandidates.filter(node => node.x < currentX).sort((a, b) => a.x - b.x || a.y - b.y)
+        : globalCandidates.filter(node => node.x > currentX).sort((a, b) => a.x - b.x || a.y - b.y);
+
+      if(ordered.length > 0){
+        const nextId = isLeft ? ordered[ordered.length - 1].id : ordered[0].id;
+        if(nextId && nextId !== currentId){
+          selectedIds = [nextId];
+          selectedId = nextId;
+          render(); renderPanel();
+        }
+        return;
+      }
+
+      const fallback = isLeft
+        ? [...globalCandidates].sort((a, b) => b.x - a.x || a.y - b.y)[0].id
+        : [...globalCandidates].sort((a, b) => a.x - b.x || a.y - b.y)[0].id;
+      if(fallback && fallback !== currentId){
+        selectedIds = [fallback];
+        selectedId = fallback;
+        render(); renderPanel();
+      }
+      return;
+    }
+
+    if(isUp || isDown){
+      const upstreamIds = (currentNode.requires || []).flatMap(group => group.filter(Boolean));
+      const downstreamIds = data.nodes
+        .filter(other => (other.requires || []).some(group => group.includes(currentId)))
+        .map(other => other.id);
+
+      const nextId = isUp
+        ? (downstreamIds[0] || null)
+        : (upstreamIds[0] || null);
+
+      if(nextId && nextId !== currentId){
+        selectedIds = [nextId];
+        selectedId = nextId;
+        render(); renderPanel();
+      }
+      return;
+    }
+
+    return;
+  }
+
+  if(selectedIds && selectedIds.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && e.key === 'Enter'){
+    const activeTag = document.activeElement && document.activeElement.tagName;
+    if(activeTag !== 'INPUT' && activeTag !== 'TEXTAREA'){
+      const labelInput = document.getElementById('label-input');
+      if(labelInput){
+        e.preventDefault();
+        labelInput.focus();
+        labelInput.select();
+      }
+    }
+  }
+
   if(e.key === 'Escape'){
     if(edgeMoveTargetSelectMode){
       edgeMoveTargetSelectMode = false;
@@ -1309,13 +1491,6 @@ document.getElementById('btn-reset').addEventListener('click', async ()=>{
   saveData();
   render(); renderPanel();
 });
-
-// 配置を再計算　の処理はいけてないので、非活性化
-// document.getElementById('btn-recompute').addEventListener('click', ()=>{
-//   autoLayoutPositions(true);
-//   saveData();
-//   render(); renderPanel();
-// });
 
 document.getElementById('btn-export').addEventListener('click', ()=>{
   saveExportName();
